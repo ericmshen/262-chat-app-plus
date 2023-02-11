@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+service MessageService {
+    rpc SendMessage(Message) returns (Status) {}
+    rpc GetMessages(MessageRequest) returns (MessageResponse) {}
+}
+
+message Status {
+    int32 code = 1;
+    string error = 2;
+}
+
+message Message {
+    string sender = 1;
+    string receiver = 2;
+    int64 timestamp = 3;
+    string body = 4;
+}
+
+message MessageRequest {
+    string receiver = 1;
+}
+
+message MessageResponse {
+    repeated Message messages = 1;
+}
