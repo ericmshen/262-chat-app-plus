@@ -15,14 +15,14 @@ messages = defaultdict(list)
 threads = []
 
 host, port = "0.0.0.0", 22067
-server_addr = (host, port)
-print(f"starting connection to {server_addr}")
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.connect_ex(server_addr)
+sock.bind((host, port))
+print("socket binded to port", port)
 
 # put the socket into listening mode
 sock.listen(5)
-# print hostname for client to connect
+print("socket is listening")
+# print hostname for client connection
 print(f"server hostname {socket.gethostname()}")
 
 # keeps track of all registered users
