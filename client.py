@@ -9,6 +9,14 @@ import threading
 
 sel = selectors.DefaultSelector()
 
+commandToInt = {
+    "register" : 0,
+    "login" : 1,
+    "send" : 2,
+    "delete" : 3
+}
+
+
 class Client:
     def __init__(self):
         # self.username = None
@@ -80,14 +88,21 @@ class Client:
             return
         # format the message in the wire format and send
         formattedMessage = utils.formatMessage(self.username, recipient, messageBody)
-        self.socket.sendall(bytes(formattedMessage, 'utf-8'))
+        return formattedMessage
     
     def recieveMessages(self) -> str:
         data = self.socket.recv(utils.MESSAGE_LENGTH)
         return utils.parseMessage(data)
     
     def listen(self):
-        print(self.socket.recv(1024))
+        while True:
+            data = self.socket.recv(1024)
+            if not data:
+                print("Detected server disconnect, shutting down")
+                self.socket.shutdown()
+                self.socket.close()
+                break
+            print(data.decode('utf-8'))
     
     def run(self):
         # self.socket.sendall(b"hello")
@@ -96,42 +111,33 @@ class Client:
         # finally:
         #     sel.close()
         try:
-            threading1 = threading.Thread(target=self.listen)
-            threading1.daemon = True
-            threading1.start()
+            # create a thread to listen for and print messages from the server
+            listener = threading.Thread(target=self.listen)
+            listener.daemon = True
+            listener.start()
             while True:
-                self.query = input(">> ")
-                if self.query == "register":
-                    username = input('please enter a username: ')
-                    self.socket.sendall(bytes(username, 'utf-8'))
-                elif self.query == "send":
-                    self.socket.sendall(b"send")
-                    recipient = input("username of recipient: ")
-                    message = input("message: ")
-                    self.sendMessage(recipient, message)
-                # elif self.query == "check":
-                #     messageBuf = ""
-                #     message = ""
-                #     self.socket.send(b"check")
-                #     messageBuf = self.socket.recv(1024).decode("utf-8") 
-                    # while True:
-                    #     message = self.socket.recv(1024)
-                    #     if not message:
-                    #         break
-
-                    #     messageBuf += str(message)
-                
-                    # print(self.checkMessages(messageBuf))
-                else :
+                self.query = input()
+                if self.query not in commandToInt:
                     print("please type an actual command")
+                else:
+                    queryInt = commandToInt[self.query]
+                    if self.query == "register":
+                        messageBody = input("please enter a username to register: ")
+                    elif self.query == "login":
+                        messageBody = input("please enter your usename to login: ")
+                    elif self.query == "send":
+                        recipient = input("username of recipient: ")
+                        message = input("message: ")
+                        self.sendMessage(recipient, message)
+                        messageBody = self.sendMessage(recipient, message)
+                    elif self.query == "delete":
+                        messageBody = input("please enter your username to confirm deletion")
+                    
+                    # send code
+                    self.socket.sendall(queryInt.to_bytes(1, "big"))
+                    # send payload
+                    self.socket.send(bytes(messageBody, 'utf-8'))
 
-                # events = sel.select(timeout=1)
-                # if events:
-                #     for key, mask in events:
-                #         self.service_connection(key, mask)
-                # Check for a socket being monitored to continue.
-                # if not sel.get_map():
-                #     break
         except KeyboardInterrupt:
             print("Caught keyboard interrupt, exiting")
         finally:
