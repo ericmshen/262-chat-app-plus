@@ -14,7 +14,7 @@ sel = selectors.DefaultSelector()
 messages = defaultdict(list)
 threads = []
 
-host, port = "0.0.0.0", 22067
+host, port = "0.0.0.0", 22068
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((host, port))
 print("socket binded to port", port)
@@ -78,18 +78,18 @@ def service_connection(sock):
             elif command == 2:
                 # TODO: change the # bytes here
                 message = sock.recv(1024).decode('utf-8').split("|")
-                sender, recipient, msg = message[0], message[1], message[2]
+                sender, recipient, msgText = message[0], message[1], message[2]
                 # check if the recipient is logged in, and if so deliver instantaneously
                 if recipient in userToSocket:
                     errcode = SENT_INSTANT_OK
                     userToSocket[recipient].sendall(
                         RECEIVED_INSTANT_OK.to_bytes(1, "big") +
-                        bytes(f"{sender}|{msg}", 'utf-8')
+                        bytes(f"{sender}|{msgText}", 'utf-8')
                     )
                 # otherwise, store the message
                 else:
                     errcode = SENT_CACHED_OK
-                    messages[recipient].append(f"{sender}|{msg}")
+                    messages[recipient].append(f"{sender}|{msgText}")
             elif command == "logout":
                 userToLogout = sock.recv(50).decode('utf-8')
                 errcode = LOGOUT_OK

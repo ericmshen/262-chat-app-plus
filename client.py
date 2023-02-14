@@ -60,9 +60,9 @@ def listen():
         if errorCode == REGISTRATION_OK:
             print(f"succesfully registered")
         elif errorCode == USERNAME_EXISTS:
-            print(f"username is already registered. please login")
+            print(f"{username} is already registered. please login")
         elif errorCode == LOGIN_OK_NO_UNREAD_MSG:
-            print(f"welcome back")
+            print(f"welcome back {username}")
             username = usrTemp
         elif errorCode == LOGIN_OK_UNREAD_MSG:
             numMessages = sock.recv(1)
@@ -74,9 +74,9 @@ def listen():
             # TODO: parse the message that is sent
             print(messages)
         elif errorCode == NOT_REGISTERED:
-            print(f"the requested user is not registered. please register before logging in")
+            print(f"{usrTemp} is not registered. please register before logging in")
         elif errorCode == ALREADY_LOGGED_IN:
-            print(f"the requested user is already logged in another terminal window")
+            print(f"{usrTemp} is already logged in another terminal window")
         elif errorCode == SEARCH_OK:
             pass
         elif errorCode == NO_RESULTS:
@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
     host, port = sys.argv[1], int(sys.argv[2])
     server_addr = (host, port)
-    print(f"Starting connection {1} to {server_addr}")
+    print(f"Starting connection to {server_addr}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect_ex(server_addr)
 
