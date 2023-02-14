@@ -46,7 +46,7 @@ def sendMessage(recipient : str, messageBody : str) -> int:
     return formattedMessage
 
 def listen():
-    global username
+    global username, usrTemp
     while True:
         errorCode = sock.recv(1)
         errorCode = int.from_bytes(errorCode, "big")
@@ -93,8 +93,12 @@ def listen():
             print(message)
         elif errorCode == LOGOUT_OK:
             print(f"successfully logged out")
+            username = None
+            usrTemp = None
         elif errorCode == DELETE_OK:
             print(f"succesfully deleted account")
+            username = None
+            usrTemp = None
         elif errorCode == UNKNOWN_ERROR:
             print(f"unknown error")
 
