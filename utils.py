@@ -1,3 +1,6 @@
+from typing import List
+import re
+
 MESSAGE_LENGTH = 1024 # TODO: change this
 
 # error codes
@@ -20,3 +23,22 @@ UNKNOWN_ERROR = 127
 
 def formatMessage(sender : str, recipient: str, messageBody: str):
     return f"{sender}|{recipient}|{messageBody}"
+
+# wildcard search interprets * as zero or more of ANY character
+def searchUsernames(usernames : List[str], query : str):
+    if len(usernames) == 0: return []
+    if len(query) == 0:
+        return usernames
+    q = query.replace("*", ".*")
+    return list(filter(lambda x: re.match(q, x), usernames))
+
+# TODO: move tests elsewhere
+if __name__ == "__main__":
+    print(formatMessage("sender1", "recipient1", "message1"))
+    print(formatMessage("sender1", "recipient1", "message2"))
+    print(formatMessage("sender1", "recipient1", "message3"))
+    print(searchUsernames(["sender1", "sender2", "sender3"], "*"))
+    print(searchUsernames(["sender1", "sender2", "sender3"], "s*"))
+    print(searchUsernames(["sender1", "sender2", "sender3"], "c*"))
+    print(searchUsernames(["sender1", "sender2", "sender3"], "*1"))
+    print(searchUsernames(["sender1", "sender2", "sender3"], "sender"))
