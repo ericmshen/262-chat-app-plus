@@ -63,8 +63,8 @@ def listen():
         elif errorCode == USERNAME_EXISTS:
             print(f"{username} is already registered. please login")
         elif errorCode == LOGIN_OK_NO_UNREAD_MSG:
-            print(f"welcome back {username}")
             username = usrTemp
+            print(f"welcome back {username}")
         elif errorCode == LOGIN_OK_UNREAD_MSG:
             numMessages = sock.recv(1)
             numMessages = int.from_bytes(numMessages, "big")
