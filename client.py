@@ -87,7 +87,7 @@ def listen():
         elif errorCode == SENT_CACHED_OK:
             print(f"your message to {recTemp} will be delivered when they log in")
         elif errorCode == RECIPIENT_DNE:
-            print(f"the {recTemp} does not exist")
+            print(f"the user {recTemp} does not exist")
         elif errorCode == RECEIVED_INSTANT_OK:
             # TODO: change the 500 here
             message = sock.recv(500)
