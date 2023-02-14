@@ -1,4 +1,22 @@
 MESSAGE_LENGTH = 1024 # TODO: change this
 
+# error codes
+REGISTRATION_OK = 0
+USERNAME_EXISTS = 1
+LOGIN_OK_NO_UNREAD_MSG = 8
+LOGIN_OK_UNREAD_MSG = 9
+NOT_REGISTERED = 9
+ALREADY_LOGGED_IN = 10
+SEARCH_OK = 16
+NO_RESULTS = 17
+SENT_INSTANT_OK = 24
+SENT_CACHED_OK = 25
+RECIPIENT_DNE = 26
+RECEIVED_INSTANT_OK = 32
+LOGOUT_OK = 40
+DELETE_OK = 48
+UNKNOWN_ERROR = 127
+
+
 def formatMessage(sender : str, recipient: str, messageBody: str):
     return f"{sender}|{recipient}|{messageBody}"
