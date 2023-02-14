@@ -16,7 +16,7 @@ messages["eric"] = ["hello my love"]
 threads = []
 
 host = "127.0.0.1"
-port = 22067
+port = 22068
 
 # keeps track of all registered users
 registeredUsers = set()
@@ -29,6 +29,8 @@ def service_connection(sock):
             # read 50 bytes for the command
             command = sock.recv(1)
             command = int.from_bytes(command, "big")
+            msg = ""
+            numUndelivered = None
             print(f"client issues command {command}")
             if command == 0:
                 username = sock.recv(50).decode('utf-8')
@@ -53,11 +55,10 @@ def service_connection(sock):
                         userToSocket[username] = sock
                         # on login we deliver all undelivered messages
                         numUndelivered = len(messages[username])
-                        sock.sendall(bytes(msg, 'utf-8'))
                         if numUndelivered > 0:
+                            # TODO: send the # bytes of the message rather than # undelivered
                             errcode = LOGIN_OK_UNREAD_MSG
-                            msg = f"you have {numUndelivered} unread messages"
-                            msg += "".join(messages[username]), 'utf-8'
+                            msg += "".join(messages[username])
                             # clear the cache
                             messages[username] = []
                         else:
@@ -66,7 +67,6 @@ def service_connection(sock):
                     errcode = NOT_REGISTERED
                     # msg = f"the username {username} is not in the system. please register before logging in"
                     # sock.sendall(bytes(msg, 'utf-8'))
-                    msg = username
             # this means the command is actually a message that is being sent
             elif command == 2:
                 # TODO: change the # bytes here
@@ -74,30 +74,40 @@ def service_connection(sock):
                 sender, recipient, msg = message[0], message[1], message[2]
                 # check if the recipient is logged in, and if so deliver instantaneously
                 if recipient in userToSocket:
-                    err = RECEIVED_INSTANT_OK
+                    errcode = SENT_INSTANT_OK
                     userToSocket[recipient].sendall(
-                        SENT_INSTANT_OK.to_bytes(1, "big") +
+                        RECEIVED_INSTANT_OK.to_bytes(1, "big") +
                         bytes(f"{sender}|{msg}", 'utf-8')
                     )
                 # otherwise, store the message
                 else:
-                    err = SENT_CACHED_OK
+                    errcode = SENT_CACHED_OK
                     messages[recipient].append(f"{sender}|{msg}")
             elif command == "logout":
                 userToLogout = sock.recv(50).decode('utf-8')
-                err = LOGOUT_OK
+                errcode = LOGOUT_OK
                 del userToSocket[userToLogout]
             elif command == "delete":
                 userToDelete = sock.recv(50).decode('utf-8')
                 # if the user is connected via the socket they are calling delete from we can delete their account
-                err = DELETE_OK
+                errcode = DELETE_OK
                 del userToSocket[userToDelete]
                 del registeredUsers[userToDelete]
             else:
                 # we should never get here
                 print("error in the command")
+
+            toSend = errcode.to_bytes(1, "big")
+            if numUndelivered and numUndelivered > 0:
+                toSend += numUndelivered.to_bytes(1, "big")
+            if len(msg) > 0:
+                toSend += bytes(msg, 'utf-8')
+            sock.sendall(toSend)
     except:
-        
+        # TODO: eye dee kay what to do here...if we get here its possible we might not even be able to send
+        err = UNKNOWN_ERROR
+
+
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((host, port))
