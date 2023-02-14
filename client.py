@@ -141,16 +141,14 @@ def run():
         print("Caught keyboard interrupt, exiting")
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
-        print(f"Usage: {sys.argv[0]} <host> <port> <socket | gRPC>")
+    if len(sys.argv) != 3:
+        print(f"Usage: {sys.argv[0]} <host> <port>")
         sys.exit(1)
 
-    # host, port, conn = sys.argv[1], int(sys.argv[2]), sys.argv[3]
-    host, port = "127.0.0.1", 22068
+    host, port = sys.argv[1], int(sys.argv[2])
     server_addr = (host, port)
     print(f"Starting connection {1} to {server_addr}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    # sock.setblocking(False)
     sock.connect_ex(server_addr)
 
     run()

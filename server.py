@@ -12,11 +12,18 @@ from utils import *
 sel = selectors.DefaultSelector()
 # maintain a dictionary of messages
 messages = defaultdict(list)
-messages["eric"] = ["hello my love"]
 threads = []
 
-host = "127.0.0.1"
-port = 22068
+host, port = "0.0.0.0", 22067
+server_addr = (host, port)
+print(f"starting connection to {server_addr}")
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.connect_ex(server_addr)
+
+# put the socket into listening mode
+sock.listen(5)
+# print hostname for client to connect
+print(f"server hostname {socket.gethostname()}")
 
 # keeps track of all registered users
 registeredUsers = set()
@@ -106,16 +113,6 @@ def service_connection(sock):
     except:
         # TODO: eye dee kay what to do here...if we get here its possible we might not even be able to send
         err = UNKNOWN_ERROR
-
-
-
-sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-sock.bind((host, port))
-print("socket binded to port", port)
-
-# put the socket into listening mode
-sock.listen(5)
-print("socket is listening")
 
 try:
     # a forever loop until client wants to exit
