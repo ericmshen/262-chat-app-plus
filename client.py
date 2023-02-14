@@ -17,6 +17,7 @@ global usrTemp
 
 username = None
 usrTemp = None
+recTemp = None
 sock = None
 query = None
     
@@ -84,9 +85,9 @@ def listen():
         elif errorCode == SENT_INSTANT_OK:
             print(f"delivered")
         elif errorCode == SENT_CACHED_OK:
-            print(f"your message will be delivered when the recipient logs in")
+            print(f"your message to {recTemp} will be delivered when they log in")
         elif errorCode == RECIPIENT_DNE:
-            print(f"the recipient does not exist")
+            print(f"the {recTemp} does not exist")
         elif errorCode == RECEIVED_INSTANT_OK:
             # TODO: change the 500 here
             message = sock.recv(500)
@@ -103,7 +104,7 @@ def listen():
             print(f"unknown error")
 
 def run():
-    global usrTemp
+    global usrTemp, recTemp
     # sock.sendall(b"hello")
     # except KeyboardInterrupt:
     #     print("Caught keyboard interrupt, exiting")
@@ -129,6 +130,7 @@ def run():
                     # do some checks
                 elif query == "send":
                     recipient = input("username of recipient: ")
+                    recTemp = recipient
                     message = input("message: ")
                     sendMessage(recipient, message)
                     messageBody = sendMessage(recipient, message)
