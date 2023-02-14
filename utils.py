@@ -27,7 +27,9 @@ def formatMessage(sender : str, recipient: str, messageBody: str):
 # wildcard search interprets * as zero or more of ANY character
 def searchUsernames(usernames : List[str], query : str):
     if len(usernames) == 0: return []
-    q = ".*" if len(query) == 0 else query.replace("*", ".*")
+    if len(query) == 0:
+        return usernames
+    q = query.replace("*", ".*")
     return list(filter(lambda x: re.match(q, x), usernames))
 
 # TODO: move tests elsewhere
