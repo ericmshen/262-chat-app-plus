@@ -48,6 +48,7 @@ def listen():
             username = None
         elif opcode == ALREADY_LOGGED_IN:
             print(f"<< {username} is already logged in")
+            username = None
         elif opcode == SEARCH_OK:
             numResults = sock.recv(MSG_HEADER_LENGTH)
             numResults = int.from_bytes(numResults, "big")
