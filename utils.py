@@ -3,7 +3,7 @@ import re
 
 MESSAGE_LENGTH = 1024 # TODO: change this
 
-# error codes
+# operation codes
 REGISTRATION_OK = 1
 USERNAME_EXISTS = 2
 LOGIN_OK_NO_UNREAD_MSG = 8
@@ -19,6 +19,14 @@ RECEIVED_INSTANT_OK = 32
 LOGOUT_OK = 40
 DELETE_OK = 48
 UNKNOWN_ERROR = 127
+
+# command codes
+REGISTER = 1
+LOGIN = 2
+SEARCH = 3
+SEND = 4
+LOGOUT = 5
+DELETE = 6
 
 
 def formatMessage(sender : str, recipient: str, messageBody: str):
