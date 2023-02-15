@@ -16,13 +16,9 @@ def run():
         print(f"Connected to {host}:{port}")
         stub = messageservice_pb2_grpc.MessageServiceStub(channel)
         # test send message
-        print("Sending message...")
-        response = stub.SendMessage(messageservice_pb2.Message(sender = "foo", receiver = "bar", body = "hello"))
-        print(f"Client received status code: {response.code}")
-        # test get message
-        print("Getting messages...")
-        response = stub.GetMessages(messageservice_pb2.MessageRequest(receiver = "bar"))
-        print(f"Client received messages: {str(response.messages)}")
+        print("Sending register...")
+        response = stub.Register(messageservice_pb2.UsernameRequest(username="poo"))
+        print(f"Client received status code: {response.statusCode}")
 
 if __name__ == '__main__':
     run()

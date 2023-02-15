@@ -13,21 +13,27 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14messageservice.proto\"%\n\x06Status\x12\x0c\n\x04\x63ode\x18\x01 \x01(\x05\x12\r\n\x05\x65rror\x18\x02 \x01(\t\"L\n\x07Message\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x10\n\x08receiver\x18\x02 \x01(\t\x12\x11\n\ttimestamp\x18\x03 \x01(\x03\x12\x0c\n\x04\x62ody\x18\x04 \x01(\t\"\"\n\x0eMessageRequest\x12\x10\n\x08receiver\x18\x01 \x01(\t\"-\n\x0fMessageResponse\x12\x1a\n\x08messages\x18\x01 \x03(\x0b\x32\x08.Message2h\n\x0eMessageService\x12\"\n\x0bSendMessage\x12\x08.Message\x1a\x07.Status\"\x00\x12\x32\n\x0bGetMessages\x12\x0f.MessageRequest\x1a\x10.MessageResponse\"\x00\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x14messageservice.proto\"#\n\x0fUsernameRequest\x12\x10\n\x08username\x18\x01 \x01(\t\"\x1e\n\rSearchRequest\x12\r\n\x05query\x18\x01 \x01(\t\"C\n\x0eMessageRequest\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x10\n\x08receiver\x18\x02 \x01(\t\x12\x0f\n\x07message\x18\x03 \x01(\t\"*\n\x07Message\x12\x0e\n\x06sender\x18\x01 \x01(\t\x12\x0f\n\x07message\x18\x02 \x01(\t\"(\n\x12StatusCodeResponse\x12\x12\n\nstatusCode\x18\x01 \x01(\x05\"5\n\x0eSearchResponse\x12\x12\n\nstatusCode\x18\x01 \x01(\t\x12\x0f\n\x07results\x18\x02 \x03(\t\"?\n\rLoginResponse\x12\x12\n\nstatusCode\x18\x01 \x01(\t\x12\x1a\n\x08messages\x18\x02 \x03(\x0b\x32\x08.Message2\xe7\x02\n\x0eMessageService\x12\x33\n\x08Register\x12\x10.UsernameRequest\x1a\x13.StatusCodeResponse\"\x00\x12\x30\n\x05Login\x12\x10.UsernameRequest\x1a\x13.StatusCodeResponse\"\x00\x12+\n\tSubscribe\x12\x10.UsernameRequest\x1a\x08.Message\"\x00\x30\x01\x12+\n\x06Search\x12\x0e.SearchRequest\x1a\x0f.SearchResponse\"\x00\x12.\n\x04Send\x12\x0f.MessageRequest\x1a\x13.StatusCodeResponse\"\x00\x12\x31\n\x06Logout\x12\x10.UsernameRequest\x1a\x13.StatusCodeResponse\"\x00\x12\x31\n\x06\x44\x65lete\x12\x10.UsernameRequest\x1a\x13.StatusCodeResponse\"\x00\x62\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'messageservice_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _STATUS._serialized_start=24
-  _STATUS._serialized_end=61
-  _MESSAGE._serialized_start=63
-  _MESSAGE._serialized_end=139
-  _MESSAGEREQUEST._serialized_start=141
-  _MESSAGEREQUEST._serialized_end=175
-  _MESSAGERESPONSE._serialized_start=177
-  _MESSAGERESPONSE._serialized_end=222
-  _MESSAGESERVICE._serialized_start=224
-  _MESSAGESERVICE._serialized_end=328
+  _USERNAMEREQUEST._serialized_start=24
+  _USERNAMEREQUEST._serialized_end=59
+  _SEARCHREQUEST._serialized_start=61
+  _SEARCHREQUEST._serialized_end=91
+  _MESSAGEREQUEST._serialized_start=93
+  _MESSAGEREQUEST._serialized_end=160
+  _MESSAGE._serialized_start=162
+  _MESSAGE._serialized_end=204
+  _STATUSCODERESPONSE._serialized_start=206
+  _STATUSCODERESPONSE._serialized_end=246
+  _SEARCHRESPONSE._serialized_start=248
+  _SEARCHRESPONSE._serialized_end=301
+  _LOGINRESPONSE._serialized_start=303
+  _LOGINRESPONSE._serialized_end=366
+  _MESSAGESERVICE._serialized_start=369
+  _MESSAGESERVICE._serialized_end=728
 # @@protoc_insertion_point(module_scope)

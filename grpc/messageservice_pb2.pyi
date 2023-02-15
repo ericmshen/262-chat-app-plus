@@ -5,34 +5,54 @@ from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Map
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class LoginResponse(_message.Message):
+    __slots__ = ["messages", "statusCode"]
+    MESSAGES_FIELD_NUMBER: _ClassVar[int]
+    STATUSCODE_FIELD_NUMBER: _ClassVar[int]
+    messages: _containers.RepeatedCompositeFieldContainer[Message]
+    statusCode: str
+    def __init__(self, statusCode: _Optional[str] = ..., messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ...) -> None: ...
+
 class Message(_message.Message):
-    __slots__ = ["body", "receiver", "sender", "timestamp"]
-    BODY_FIELD_NUMBER: _ClassVar[int]
-    RECEIVER_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ["message", "sender"]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
     SENDER_FIELD_NUMBER: _ClassVar[int]
-    TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
-    body: str
-    receiver: str
+    message: str
     sender: str
-    timestamp: int
-    def __init__(self, sender: _Optional[str] = ..., receiver: _Optional[str] = ..., timestamp: _Optional[int] = ..., body: _Optional[str] = ...) -> None: ...
+    def __init__(self, sender: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
 
 class MessageRequest(_message.Message):
-    __slots__ = ["receiver"]
+    __slots__ = ["message", "receiver", "sender"]
+    MESSAGE_FIELD_NUMBER: _ClassVar[int]
     RECEIVER_FIELD_NUMBER: _ClassVar[int]
+    SENDER_FIELD_NUMBER: _ClassVar[int]
+    message: str
     receiver: str
-    def __init__(self, receiver: _Optional[str] = ...) -> None: ...
+    sender: str
+    def __init__(self, sender: _Optional[str] = ..., receiver: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
 
-class MessageResponse(_message.Message):
-    __slots__ = ["messages"]
-    MESSAGES_FIELD_NUMBER: _ClassVar[int]
-    messages: _containers.RepeatedCompositeFieldContainer[Message]
-    def __init__(self, messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ...) -> None: ...
+class SearchRequest(_message.Message):
+    __slots__ = ["query"]
+    QUERY_FIELD_NUMBER: _ClassVar[int]
+    query: str
+    def __init__(self, query: _Optional[str] = ...) -> None: ...
 
-class Status(_message.Message):
-    __slots__ = ["code", "error"]
-    CODE_FIELD_NUMBER: _ClassVar[int]
-    ERROR_FIELD_NUMBER: _ClassVar[int]
-    code: int
-    error: str
-    def __init__(self, code: _Optional[int] = ..., error: _Optional[str] = ...) -> None: ...
+class SearchResponse(_message.Message):
+    __slots__ = ["results", "statusCode"]
+    RESULTS_FIELD_NUMBER: _ClassVar[int]
+    STATUSCODE_FIELD_NUMBER: _ClassVar[int]
+    results: _containers.RepeatedScalarFieldContainer[str]
+    statusCode: str
+    def __init__(self, statusCode: _Optional[str] = ..., results: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class StatusCodeResponse(_message.Message):
+    __slots__ = ["statusCode"]
+    STATUSCODE_FIELD_NUMBER: _ClassVar[int]
+    statusCode: int
+    def __init__(self, statusCode: _Optional[int] = ...) -> None: ...
+
+class UsernameRequest(_message.Message):
+    __slots__ = ["username"]
+    USERNAME_FIELD_NUMBER: _ClassVar[int]
+    username: str
+    def __init__(self, username: _Optional[str] = ...) -> None: ...

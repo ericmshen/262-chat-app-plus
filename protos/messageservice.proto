@@ -1,26 +1,60 @@
 syntax = "proto3";
 
 service MessageService {
-    rpc SendMessage(Message) returns (Status) {}
-    rpc GetMessages(MessageRequest) returns (MessageResponse) {}
+    rpc Register(UsernameRequest) returns (StatusCodeResponse) {}
+    rpc Login(UsernameRequest) returns (StatusCodeResponse) {}
+    rpc Subscribe(UsernameRequest) returns (stream Message) {}
+    rpc Search(SearchRequest) returns (SearchResponse) {}
+    rpc Send(MessageRequest) returns (StatusCodeResponse) {}
+    rpc Logout(UsernameRequest) returns (StatusCodeResponse) {}
+    rpc Delete(UsernameRequest) returns (StatusCodeResponse) {}
 }
 
-message Status {
-    int32 code = 1;
-    string error = 2;
+// *** Protos used for client requests ***
+// Proto used for register, login, logout, and delete
+// Only a username string is required
+message UsernameRequest {
+    string username = 1;
 }
 
-message Message {
+// Proto used for search
+// Only a query string, if any, is required
+message SearchRequest {
+    string query = 1;
+}
+
+// Proto used for send
+// A sender, receiver, and message are required
+message MessageRequest {
     string sender = 1;
     string receiver = 2;
-    int64 timestamp = 3;
-    string body = 4;
+    string message = 3;
 }
 
-message MessageRequest {
-    string receiver = 1;
+// *** Protos used for server responses ***
+// Proto used for (an already-determined) client receiving messages
+// A sender and message are required
+message Message {
+    string sender = 1;
+    string message = 2;
 }
 
-message MessageResponse {
-    repeated Message messages = 1;
+// Proto used for register, logout, and delete
+// Only a status code is required
+message StatusCodeResponse {
+    int32 statusCode = 1;
+}
+
+// Proto used for search
+// A status code and results, if any, are required
+message SearchResponse {
+    string statusCode = 1;
+    repeated string results = 2;
+}
+
+// Proto used for login
+// A status code and unread messages, if any, are required
+message LoginResponse {
+    string statusCode = 1;
+    repeated Message messages = 2;
 }

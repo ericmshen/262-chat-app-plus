@@ -14,28 +14,83 @@ class MessageServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
-        self.SendMessage = channel.unary_unary(
-                '/MessageService/SendMessage',
-                request_serializer=messageservice__pb2.Message.SerializeToString,
-                response_deserializer=messageservice__pb2.Status.FromString,
+        self.Register = channel.unary_unary(
+                '/MessageService/Register',
+                request_serializer=messageservice__pb2.UsernameRequest.SerializeToString,
+                response_deserializer=messageservice__pb2.StatusCodeResponse.FromString,
                 )
-        self.GetMessages = channel.unary_unary(
-                '/MessageService/GetMessages',
+        self.Login = channel.unary_unary(
+                '/MessageService/Login',
+                request_serializer=messageservice__pb2.UsernameRequest.SerializeToString,
+                response_deserializer=messageservice__pb2.StatusCodeResponse.FromString,
+                )
+        self.Subscribe = channel.unary_stream(
+                '/MessageService/Subscribe',
+                request_serializer=messageservice__pb2.UsernameRequest.SerializeToString,
+                response_deserializer=messageservice__pb2.Message.FromString,
+                )
+        self.Search = channel.unary_unary(
+                '/MessageService/Search',
+                request_serializer=messageservice__pb2.SearchRequest.SerializeToString,
+                response_deserializer=messageservice__pb2.SearchResponse.FromString,
+                )
+        self.Send = channel.unary_unary(
+                '/MessageService/Send',
                 request_serializer=messageservice__pb2.MessageRequest.SerializeToString,
-                response_deserializer=messageservice__pb2.MessageResponse.FromString,
+                response_deserializer=messageservice__pb2.StatusCodeResponse.FromString,
+                )
+        self.Logout = channel.unary_unary(
+                '/MessageService/Logout',
+                request_serializer=messageservice__pb2.UsernameRequest.SerializeToString,
+                response_deserializer=messageservice__pb2.StatusCodeResponse.FromString,
+                )
+        self.Delete = channel.unary_unary(
+                '/MessageService/Delete',
+                request_serializer=messageservice__pb2.UsernameRequest.SerializeToString,
+                response_deserializer=messageservice__pb2.StatusCodeResponse.FromString,
                 )
 
 
 class MessageServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
-    def SendMessage(self, request, context):
+    def Register(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def GetMessages(self, request, context):
+    def Login(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Subscribe(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Search(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Send(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Logout(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def Delete(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -44,15 +99,40 @@ class MessageServiceServicer(object):
 
 def add_MessageServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'SendMessage': grpc.unary_unary_rpc_method_handler(
-                    servicer.SendMessage,
-                    request_deserializer=messageservice__pb2.Message.FromString,
-                    response_serializer=messageservice__pb2.Status.SerializeToString,
+            'Register': grpc.unary_unary_rpc_method_handler(
+                    servicer.Register,
+                    request_deserializer=messageservice__pb2.UsernameRequest.FromString,
+                    response_serializer=messageservice__pb2.StatusCodeResponse.SerializeToString,
             ),
-            'GetMessages': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetMessages,
+            'Login': grpc.unary_unary_rpc_method_handler(
+                    servicer.Login,
+                    request_deserializer=messageservice__pb2.UsernameRequest.FromString,
+                    response_serializer=messageservice__pb2.StatusCodeResponse.SerializeToString,
+            ),
+            'Subscribe': grpc.unary_stream_rpc_method_handler(
+                    servicer.Subscribe,
+                    request_deserializer=messageservice__pb2.UsernameRequest.FromString,
+                    response_serializer=messageservice__pb2.Message.SerializeToString,
+            ),
+            'Search': grpc.unary_unary_rpc_method_handler(
+                    servicer.Search,
+                    request_deserializer=messageservice__pb2.SearchRequest.FromString,
+                    response_serializer=messageservice__pb2.SearchResponse.SerializeToString,
+            ),
+            'Send': grpc.unary_unary_rpc_method_handler(
+                    servicer.Send,
                     request_deserializer=messageservice__pb2.MessageRequest.FromString,
-                    response_serializer=messageservice__pb2.MessageResponse.SerializeToString,
+                    response_serializer=messageservice__pb2.StatusCodeResponse.SerializeToString,
+            ),
+            'Logout': grpc.unary_unary_rpc_method_handler(
+                    servicer.Logout,
+                    request_deserializer=messageservice__pb2.UsernameRequest.FromString,
+                    response_serializer=messageservice__pb2.StatusCodeResponse.SerializeToString,
+            ),
+            'Delete': grpc.unary_unary_rpc_method_handler(
+                    servicer.Delete,
+                    request_deserializer=messageservice__pb2.UsernameRequest.FromString,
+                    response_serializer=messageservice__pb2.StatusCodeResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -65,7 +145,7 @@ class MessageService(object):
     """Missing associated documentation comment in .proto file."""
 
     @staticmethod
-    def SendMessage(request,
+    def Register(request,
             target,
             options=(),
             channel_credentials=None,
@@ -75,14 +155,14 @@ class MessageService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/MessageService/SendMessage',
-            messageservice__pb2.Message.SerializeToString,
-            messageservice__pb2.Status.FromString,
+        return grpc.experimental.unary_unary(request, target, '/MessageService/Register',
+            messageservice__pb2.UsernameRequest.SerializeToString,
+            messageservice__pb2.StatusCodeResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
-    def GetMessages(request,
+    def Login(request,
             target,
             options=(),
             channel_credentials=None,
@@ -92,8 +172,93 @@ class MessageService(object):
             wait_for_ready=None,
             timeout=None,
             metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/MessageService/GetMessages',
+        return grpc.experimental.unary_unary(request, target, '/MessageService/Login',
+            messageservice__pb2.UsernameRequest.SerializeToString,
+            messageservice__pb2.StatusCodeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Subscribe(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(request, target, '/MessageService/Subscribe',
+            messageservice__pb2.UsernameRequest.SerializeToString,
+            messageservice__pb2.Message.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Search(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/MessageService/Search',
+            messageservice__pb2.SearchRequest.SerializeToString,
+            messageservice__pb2.SearchResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Send(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/MessageService/Send',
             messageservice__pb2.MessageRequest.SerializeToString,
-            messageservice__pb2.MessageResponse.FromString,
+            messageservice__pb2.StatusCodeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Logout(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/MessageService/Logout',
+            messageservice__pb2.UsernameRequest.SerializeToString,
+            messageservice__pb2.StatusCodeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def Delete(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/MessageService/Delete',
+            messageservice__pb2.UsernameRequest.SerializeToString,
+            messageservice__pb2.StatusCodeResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
