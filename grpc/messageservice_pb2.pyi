@@ -10,26 +10,26 @@ class LoginResponse(_message.Message):
     MESSAGES_FIELD_NUMBER: _ClassVar[int]
     STATUSCODE_FIELD_NUMBER: _ClassVar[int]
     messages: _containers.RepeatedCompositeFieldContainer[Message]
-    statusCode: str
-    def __init__(self, statusCode: _Optional[str] = ..., messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ...) -> None: ...
+    statusCode: int
+    def __init__(self, statusCode: _Optional[int] = ..., messages: _Optional[_Iterable[_Union[Message, _Mapping]]] = ...) -> None: ...
 
 class Message(_message.Message):
-    __slots__ = ["message", "sender"]
-    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ["body", "sender"]
+    BODY_FIELD_NUMBER: _ClassVar[int]
     SENDER_FIELD_NUMBER: _ClassVar[int]
-    message: str
+    body: str
     sender: str
-    def __init__(self, sender: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
+    def __init__(self, sender: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
 
 class MessageRequest(_message.Message):
-    __slots__ = ["message", "receiver", "sender"]
-    MESSAGE_FIELD_NUMBER: _ClassVar[int]
+    __slots__ = ["body", "receiver", "sender"]
+    BODY_FIELD_NUMBER: _ClassVar[int]
     RECEIVER_FIELD_NUMBER: _ClassVar[int]
     SENDER_FIELD_NUMBER: _ClassVar[int]
-    message: str
+    body: str
     receiver: str
     sender: str
-    def __init__(self, sender: _Optional[str] = ..., receiver: _Optional[str] = ..., message: _Optional[str] = ...) -> None: ...
+    def __init__(self, sender: _Optional[str] = ..., receiver: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
 
 class SearchRequest(_message.Message):
     __slots__ = ["query"]
@@ -42,8 +42,8 @@ class SearchResponse(_message.Message):
     RESULTS_FIELD_NUMBER: _ClassVar[int]
     STATUSCODE_FIELD_NUMBER: _ClassVar[int]
     results: _containers.RepeatedScalarFieldContainer[str]
-    statusCode: str
-    def __init__(self, statusCode: _Optional[str] = ..., results: _Optional[_Iterable[str]] = ...) -> None: ...
+    statusCode: int
+    def __init__(self, statusCode: _Optional[int] = ..., results: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class StatusCodeResponse(_message.Message):
     __slots__ = ["statusCode"]

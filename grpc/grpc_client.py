@@ -1,9 +1,30 @@
 import grpc
-import messageservice_pb2
+from messageservice_pb2 import *
 import messageservice_pb2_grpc
 import sys
 
-def run():
+def run(stub:messageservice_pb2_grpc.MessageServiceStub):
+    pass
+
+def test(stub:messageservice_pb2_grpc.MessageServiceStub):
+    # test send message
+    print("Sending invalid login...")
+    response = stub.Login(UsernameRequest(username="poo"))
+    print(f"Client received status code: {response.statusCode}")
+    print("Sending register...")
+    response = stub.Register(UsernameRequest(username="poo"))
+    print(f"Client received status code: {response.statusCode}")
+    print("Sending re-register...")
+    response = stub.Register(UsernameRequest(username="poo"))
+    print(f"Client received status code: {response.statusCode}")
+    print("Sending login...")
+    response = stub.Login(UsernameRequest(username="poo"))
+    print(f"Client received status code: {response.statusCode}")
+    print("Sending invalid login...")
+    response = stub.Login(UsernameRequest(username="poopy balls"))
+    print(f"Client received status code: {response.statusCode}")
+
+def startClient():
     if len(sys.argv) != 2:
         print(f"Usage: {sys.argv[0]} <host>")
         sys.exit(1)
@@ -15,10 +36,7 @@ def run():
     with grpc.insecure_channel(host + ":" + port) as channel:
         print(f"Connected to {host}:{port}")
         stub = messageservice_pb2_grpc.MessageServiceStub(channel)
-        # test send message
-        print("Sending register...")
-        response = stub.Register(messageservice_pb2.UsernameRequest(username="poo"))
-        print(f"Client received status code: {response.statusCode}")
+        run(stub)
 
 if __name__ == '__main__':
-    run()
+    startClient()

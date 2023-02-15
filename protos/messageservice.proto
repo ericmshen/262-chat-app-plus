@@ -28,7 +28,7 @@ message SearchRequest {
 message MessageRequest {
     string sender = 1;
     string receiver = 2;
-    string message = 3;
+    string body = 3;
 }
 
 // *** Protos used for server responses ***
@@ -36,7 +36,7 @@ message MessageRequest {
 // A sender and message are required
 message Message {
     string sender = 1;
-    string message = 2;
+    string body = 2;
 }
 
 // Proto used for register, logout, and delete
@@ -48,13 +48,13 @@ message StatusCodeResponse {
 // Proto used for search
 // A status code and results, if any, are required
 message SearchResponse {
-    string statusCode = 1;
+    int32 statusCode = 1;
     repeated string results = 2;
 }
 
 // Proto used for login
 // A status code and unread messages, if any, are required
 message LoginResponse {
-    string statusCode = 1;
+    int32 statusCode = 1;
     repeated Message messages = 2;
 }
