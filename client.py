@@ -1,115 +1,81 @@
 import sys
 import socket
-import traceback
 from utils import *
-import types
 import threading
 
-commandToInt = {
-    "register" : 0,
-    "login" : 1,
-    "send" : 2,
-    "delete" : 3
-}
-
-global username
-global usrTemp
-
 username = None
-usrTemp = None
-recTemp = None
+recipient = None
 sock = None
 query = None
-    
-    # TODO: we should probably have 1) docstrings for each function 2) return values for each functions so we can catch errors
 
-def checkMessages(message : str) -> str:
-    messages = message.split("\n")
-    retMsg = ""
-    for msg in messages:
-        messageLst = msg.split("|")
-        retMsg += f"{messageLst[0]}: {messageLst[1]}"
-
-    return retMsg
-                # TODO: check that they don't use any of our delimiters | or \n (for login)
-
-def sendMessage(recipient : str, messageBody : str) -> int:
-    # the connection to the server has not been made yet
-    if sock == None:
-        print("You must connect to the server before you can send messages")
-        return
-    # the client is not logged in
-    if username == None:
-        print("You must login before you can send messages")
-        return
-    # format the message in the wire format and send
-    formattedMessage = formatMessage(username, recipient, messageBody)
-    return formattedMessage
+commandToInt = {
+    "register" : REGISTER,
+    "login" : LOGIN,
+    "search" : SEARCH,
+    "send" : SEND,
+    "logout" : LOGOUT,
+    "delete" : DELETE
+}
 
 def listen():
-    global username, usrTemp
+    global username
     while True:
-        errorCode = sock.recv(1)
-        errorCode = int.from_bytes(errorCode, "big")
-
-        if not errorCode:
-            print("detected server disconnect, shutting down")
+        # get the operation code and decode it into a 1 byte integer
+        opcode = sock.recv(OPCODE_LENGTH)
+        opcode = int.from_bytes(opcode, "big")
+        # if the server disconnects, it sends back a None or 0
+        if not opcode:
+            print("<< detected server disconnect, shutting down")
             sock.shutdown(socket.SHUT_RDWR)
             sock.close()
             break
-        
-        if errorCode == REGISTRATION_OK:
-            print(f"succesfully registered")
-        elif errorCode == USERNAME_EXISTS:
-            print(f"{username} is already registered. please login")
-        elif errorCode == LOGIN_OK_NO_UNREAD_MSG:
-            username = usrTemp
-            print(f"welcome back {username}")
-        elif errorCode == LOGIN_OK_UNREAD_MSG:
-            numMessages = sock.recv(1)
+        if opcode == REGISTRATION_OK:
+            print(f"<< {username} succesfully registered. please login")
+            username = None
+        elif opcode == USERNAME_EXISTS:
+            print(f"<< {username} is already registered. please login")
+            username = None
+        elif opcode == LOGIN_OK_NO_UNREAD_MSG:
+            print(f"<< welcome back {username}")
+        elif opcode == LOGIN_OK_UNREAD_MSG:
+            numMessages = sock.recv(MSG_HEADER_LENGTH)
             numMessages = int.from_bytes(numMessages, "big")
-            username = usrTemp
-            print(f"you have {numMessages} new messages")
-            # TODO: change to the actual # bytes we are reading
-            messages = sock.recv(numMessages * 500)
-            # TODO: parse the message that is sent
-            print(messages)
-        elif errorCode == NOT_REGISTERED:
-            print(f"{usrTemp} is not registered. please register before logging in")
-        elif errorCode == ALREADY_LOGGED_IN:
-            print(f"{usrTemp} is already logged in another terminal window")
-        elif errorCode == SEARCH_OK:
-            pass
-        elif errorCode == NO_RESULTS:
-            pass
-        elif errorCode == SENT_INSTANT_OK:
-            print(f"delivered")
-        elif errorCode == SENT_CACHED_OK:
-            print(f"your message to {recTemp} will be delivered when they log in")
-        elif errorCode == RECIPIENT_DNE:
-            print(f"the user {recTemp} does not exist")
-        elif errorCode == RECEIVED_INSTANT_OK:
-            # TODO: change the 500 here
-            message = sock.recv(500)
-            print(message)
-        elif errorCode == LOGOUT_OK:
-            print(f"successfully logged out")
+            print(f"<< you have {numMessages} new messages")
+            messages = sock.recv(numMessages * (MESSAGE_LENGTH + USERNAME_LENGTH + 2 * DELIMITER_LENGTH)).decode('ascii')
+            print(parseMessages(messages))
+        elif opcode == NOT_REGISTERED:
+            print(f"<< {username} is not registered. please register before logging in")
             username = None
-            usrTemp = None
-        elif errorCode == DELETE_OK:
-            print(f"succesfully deleted account")
+        elif opcode == ALREADY_LOGGED_IN:
+            print(f"<< {username} is already logged in")
+        elif opcode == SEARCH_OK:
+            numResults = sock.recv(MSG_HEADER_LENGTH)
+            numResults = int.from_bytes(numResults, "big")
+            print(f"<< {numResults} usernames matched your query:")
+            results = sock.recv(numResults * (USERNAME_LENGTH + DELIMITER_LENGTH)).decode('ascii')
+            print(parseSearchResults(results))
+        elif opcode == NO_RESULTS:
+            print("<< no usernames matched your query")
+        elif opcode == SENT_INSTANT_OK:
+            print(f"<< delivered")
+        elif opcode == SENT_CACHED_OK:
+            print(f"<< your message to {recipient} will be delivered when they log in")
+        elif opcode == RECIPIENT_DNE:
+            print(f"<< the user {recipient} does not exist")
+        elif opcode == RECEIVED_INSTANT_OK:
+            message = sock.recv(MESSAGE_LENGTH + USERNAME_LENGTH + DELIMITER_LENGTH).decode('ascii')
+            print(parseMessages(message))
+        elif opcode == LOGOUT_OK:
+            print(f"<< successfully logged out")
             username = None
-            usrTemp = None
-        elif errorCode == UNKNOWN_ERROR:
-            print(f"unknown error")
+        elif opcode == DELETE_OK:
+            print(f"<< succesfully deleted account")
+            username = None
+        elif opcode == UNKNOWN_ERROR:
+            print(f"<< unknown error")
 
 def run():
-    global usrTemp, recTemp
-    # sock.sendall(b"hello")
-    # except KeyboardInterrupt:
-    #     print("Caught keyboard interrupt, exiting")
-    # finally:
-    #     sel.close()
+    global username, recipient
     try:
         # create a thread to listen for and print messages from the server
         listener = threading.Thread(target=listen)
@@ -117,36 +83,60 @@ def run():
         listener.start()
         while True:
             messageBody = None
-            query = input()
+            query = input(">>").lower().strip()
             if query not in commandToInt:
-                print("please type an actual command")
+                print("<< please type an actual command")
             else:
                 queryInt = commandToInt[query]
-                if query == "register":
-                    messageBody = input("please enter a username to register: ")
-                elif query == "login":
-                    messageBody = input("please enter your username to login: ")
-                    usrTemp = messageBody
-                    # do some checks
-                elif query == "send":
-                    recipient = input("username of recipient: ")
-                    recTemp = recipient
-                    message = input("message: ")
-                    sendMessage(recipient, message)
-                    messageBody = sendMessage(recipient, message)
-                elif query == "delete":
-                    messageBody = input("please enter your username to confirm deletion")
+                if queryInt in { REGISTER, LOGIN }:
+                    if username:
+                        print(f"<< you are already logged in as {username}, please logout and try again")
+                        continue
+                    username_ = input(">> please enter username: ").strip()
+                    if not isValidUsername(username_):
+                        print("<< usernames may not be blank, must be under 50 characters, and must be alphanumeric, please try again")
+                        continue
+                    messageBody = username_
+                    username = username_
+                elif queryInt == SEARCH:
+                    query = input(">> enter query: ").strip()
+                    if not isValidQuery(query):
+                        print("<< search queries may not be blank, must be under 50 characters, and must be comprised of alphanumerics and wildcards (*), please try again")
+                        continue
+                    messageBody = query
+                elif queryInt == SEND:
+                    if not username:
+                        print(">> you must be logged in to send a message")
+                        continue
+                    recipient_ = input(">> username of recipient: ")
+                    if not isValidUsername(recipient_):
+                        print("<< invalid username, please try again")
+                    message = input(">> message: ").strip()
+                    if not isValidMessage(message):
+                        print("<< messages must not contain the newline character or the '|' character, may not be blank, and must be under 262 characters, please try again")
+                    recipient = recipient_
+                    messageBody = formatMessage(username, recipient_, message)
+                elif queryInt in { LOGOUT, DELETE } :
+                    if not username:
+                        print("<< you are not logged in to an account")
+                        continue
+                    username_ = input(f">> enter username to confirm {query}: ").strip()
+                    if not isValidUsername(username_):
+                        print("<< invalid username")
+                        continue
+                    if username_ != username:
+                        print("<< the username typed does not match your username, please try again")
+                        continue
+                    messageBody = username_
                 
                 if messageBody:
-                    # send code
-                    sock.sendall(queryInt.to_bytes(1, "big"))
-                    # send payload
-                    sock.send(bytes(messageBody, 'utf-8'))
+                    # send code and payload
+                    sock.sendall(queryInt.to_bytes(OPCODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
 
     except KeyboardInterrupt:
         print("Caught keyboard interrupt, exiting")
 
-if __name__ == "__main__":
+if __name__ == "__main__":    
     if len(sys.argv) != 3:
         print(f"Usage: {sys.argv[0]} <host> <port>")
         sys.exit(1)
@@ -156,5 +146,4 @@ if __name__ == "__main__":
     print(f"Starting connection to {server_addr}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect_ex(server_addr)
-
     run()
