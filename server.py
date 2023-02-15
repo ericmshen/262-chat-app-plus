@@ -9,7 +9,7 @@ sel = selectors.DefaultSelector()
 messages = defaultdict(list)
 threads = []
 
-host, port = "0.0.0.0", 22068
+host, port = "0.0.0.0", 22067
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((host, port))
 print("socket bound to port", port)

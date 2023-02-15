@@ -83,7 +83,7 @@ def run():
         listener.start()
         while True:
             messageBody = None
-            query = input(">>").lower().strip()
+            query = input("").lower().strip()
             if query not in commandToInt:
                 print("<< please type an actual command")
             else:
