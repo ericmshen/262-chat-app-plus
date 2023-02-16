@@ -13,13 +13,13 @@ threads = []
 host, port = "0.0.0.0", 22067
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 sock.bind((host, port))
+print(f"server hostname {socket.gethostname()}")
 print("socket bound to port", port)
 
 # put the socket into listening mode
 sock.listen(5)
 print("socket is listening")
 # print hostname for client connection
-print(f"server hostname {socket.gethostname()}")
 
 # keeps track of all registered users
 registeredUsers = set()

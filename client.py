@@ -25,6 +25,7 @@ def listen():
         try:
             code = sock.recv(CODE_LENGTH)
             code = int.from_bytes(code, "big")
+        # there's an error communicating with the server
         except:
             print("not connected to server, exiting client")
             sock.close()
@@ -32,7 +33,7 @@ def listen():
             os._exit(0)
         # if the server disconnects, it sends back a None or 0
         if not code:
-            print("not connected to server, exiting client")
+            print("server has disconnected, exiting client")
             sock.close()
             # quit the program
             os._exit(0)
@@ -137,24 +138,21 @@ def run():
                     continue
                 messageBody = usernameInput
             else: # only DISCONNECT commands remain: "bye", "disconnect", "quit"
-                print("<< starting disconnect")
                 raise KeyboardInterrupt
-            
+
             if messageBody:
                 # send code and payload
                 sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
 
     except KeyboardInterrupt:
-        print("\ncaught interrupt, shutting down connection")
+        print("\n<< caught interrupt, shutting down connection")
         if username:
             print(f"automatically logging out {username}")
-            sock.sendall(opcode.to_bytes(OP_LOGOUT, "big") + bytes(username, 'ascii'))
+            opcode = OP_LOGOUT
+            sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(username, 'ascii'))
             username = None
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
-        else:
-            sock.shutdown(socket.SHUT_RDWR)
-            sock.close()
+        sock.shutdown(socket.SHUT_RDWR)
+        sock.close()
         sys.exit(0)
 
 if __name__ == "__main__":
