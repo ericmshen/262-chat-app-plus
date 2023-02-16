@@ -3,7 +3,7 @@ import socket
 from utils import *
 import threading
 import os
-from _thread import interrupt_main
+from time import sleep
 
 # Username of the logged in user on the client code. If None, no user is logged in.
 # We use this as a proxy for detecting if the client code has someone logged in or not.
@@ -149,6 +149,7 @@ def run():
         if username:
             print(f"automatically logging out {username}")
             sock.sendall(opcode.to_bytes(OP_LOGOUT, "big") + bytes(username, 'ascii'))
+            username = None
             sock.shutdown(socket.SHUT_RDWR)
             sock.close()
         else:
