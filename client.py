@@ -44,13 +44,16 @@ def listen():
             print(f"<< {username} is already registered. please login")
             username = None
         elif code == LOGIN_OK_NO_UNREAD_MSG:
-            print(f"<< welcome back {username}")
+            print(f"<< welcome {username}, you have no new messages")
         elif code == LOGIN_OK_UNREAD_MSG:
             numMessages = sock.recv(MSG_HEADER_LENGTH)
             numMessages = int.from_bytes(numMessages, "big")
-            print(f"<< you have {numMessages} new messages")
+            if numMessages == 1:
+                print(f"<< welcome {username}, you have one new message:")
+            else:
+                print(f"<< welcome {username}, you have {numMessages} new messages:")
             messages = sock.recv(numMessages * (MESSAGE_LENGTH + USERNAME_LENGTH + 2 * DELIMITER_LENGTH)).decode('ascii')
-            print(parseMessages(messages))
+            print(parseMessages(messages), end="")
         elif code == LOGIN_NOT_REGISTERED:
             print(f"<< {username} is not registered. please register before logging in")
             username = None
@@ -60,7 +63,10 @@ def listen():
         elif code == SEARCH_OK:
             numResults = sock.recv(MSG_HEADER_LENGTH)
             numResults = int.from_bytes(numResults, "big")
-            print(f"<< {numResults} usernames matched your query:")
+            if numResults == 1:
+                print(f"<< 1 username matched your query:")
+            else:
+                print(f"{numResults} usernames matched your query:")
             results = sock.recv(numResults * (USERNAME_LENGTH + DELIMITER_LENGTH)).decode('ascii')
             print(parseSearchResults(results))
         elif code == SEARCH_NO_RESULTS:
@@ -73,7 +79,7 @@ def listen():
             print(f"<< the user {recipient} does not exist")
         elif code == RECEIVE_OK:
             message = sock.recv(MESSAGE_LENGTH + USERNAME_LENGTH + DELIMITER_LENGTH).decode('ascii')
-            print(parseMessages(message))
+            print(parseMessages(message), end="")
         elif code == LOGOUT_OK:
             print(f"<< successfully logged out")
             username = None
@@ -82,68 +88,78 @@ def listen():
             username = None
         elif code == UNKNOWN_ERROR:
             print(f"<< unknown error")
+            
+def interpret():
+    global username, recipient
+    while True:
+        messageBody = None
+        command = input("").lower().strip()
+        if command not in commandToOpcode:
+            print("<< please type an actual command")
+            continue
+        opcode = commandToOpcode[command]
+        if opcode in { OP_REGISTER, OP_LOGIN }:
+            if username:
+                print(f"<< you are already logged in as {username}, please logout and try again")
+                continue
+            usernameInput = input(">> please enter username: ").strip()
+            if not isValidUsername(usernameInput):
+                print("<< usernames may not be blank, must be under 50 characters, and must be alphanumeric, please try again")
+                continue
+            messageBody = usernameInput
+            username = usernameInput
+        elif opcode == OP_SEARCH:
+            query = input(">> enter query: ").strip()
+            if not isValidQuery(query):
+                print("<< search queries may not be blank, must be under 50 characters, and must be comprised of alphanumerics and wildcards (*), please try again")
+                continue
+            messageBody = query
+        elif opcode == OP_SEND:
+            if not username:
+                print(">> you must be logged in to send a message")
+                continue
+            recipientInput = input(">> username of recipient: ")
+            if not isValidUsername(recipientInput):
+                print("<< invalid username, please try again")
+            message = input(">> message: ").strip()
+            if not isValidMessage(message):
+                print("<< messages must not contain the newline character or the '|' character, may not be blank, and must be under 262 characters, please try again")
+            recipient = recipientInput
+            messageBody = formatMessage(username, recipientInput, message)
+        elif opcode in { OP_LOGOUT, OP_DELETE } :
+            if not username:
+                print("<< you are not logged in to an account")
+                continue
+            usernameInput = input(f">> enter username to confirm {command}: ").strip()
+            if not isValidUsername(usernameInput):
+                print("<< invalid username")
+                continue
+            if usernameInput != username:
+                print("<< the username typed does not match your username, please try again")
+                continue
+            messageBody = usernameInput
+        else: # only OP_DISCONNECT commands remain: "bye", "disconnect", "quit"
+            # logic is already handled in KeyboardInterrupt exception handling
+            raise KeyboardInterrupt
+
+        if messageBody:
+            # send code and payload
+            sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
 
 def run():
-    global username, recipient
+    global username
     try:
-        # create a thread to listen for and print messages from the server
+        # create a thread to run listen(), which listens for and handles messages 
+        # from the server
         listener = threading.Thread(target=listen)
         listener.daemon = True
         listener.start()
-        while True:
-            messageBody = None
-            command = input("").lower().strip()
-            if command not in commandToOpcode:
-                print("<< please type an actual command")
-                continue
-            opcode = commandToOpcode[command]
-            if opcode in { OP_REGISTER, OP_LOGIN }:
-                if username:
-                    print(f"<< you are already logged in as {username}, please logout and try again")
-                    continue
-                usernameInput = input(">> please enter username: ").strip()
-                if not isValidUsername(usernameInput):
-                    print("<< usernames may not be blank, must be under 50 characters, and must be alphanumeric, please try again")
-                    continue
-                messageBody = usernameInput
-                username = usernameInput
-            elif opcode == OP_SEARCH:
-                query = input(">> enter query: ").strip()
-                if not isValidQuery(query):
-                    print("<< search queries may not be blank, must be under 50 characters, and must be comprised of alphanumerics and wildcards (*), please try again")
-                    continue
-                messageBody = query
-            elif opcode == OP_SEND:
-                if not username:
-                    print(">> you must be logged in to send a message")
-                    continue
-                recipientInput = input(">> username of recipient: ")
-                if not isValidUsername(recipientInput):
-                    print("<< invalid username, please try again")
-                message = input(">> message: ").strip()
-                if not isValidMessage(message):
-                    print("<< messages must not contain the newline character or the '|' character, may not be blank, and must be under 262 characters, please try again")
-                recipient = recipientInput
-                messageBody = formatMessage(username, recipientInput, message)
-            elif opcode in { OP_LOGOUT, OP_DELETE } :
-                if not username:
-                    print("<< you are not logged in to an account")
-                    continue
-                usernameInput = input(f">> enter username to confirm {command}: ").strip()
-                if not isValidUsername(usernameInput):
-                    print("<< invalid username")
-                    continue
-                if usernameInput != username:
-                    print("<< the username typed does not match your username, please try again")
-                    continue
-                messageBody = usernameInput
-            else: # only DISCONNECT commands remain: "bye", "disconnect", "quit"
-                raise KeyboardInterrupt
-
-            if messageBody:
-                # send code and payload
-                sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
-
+        
+        # run interpret, which handles user input, parsing, and requests to server, 
+        # in the main thread
+        interpret()
+        
+    # users may quit via a KeyboardInterrupt, or by typing a command for OP_DISCONNECT
     except KeyboardInterrupt:
         print("\n<< caught interrupt, shutting down connection")
         if username:

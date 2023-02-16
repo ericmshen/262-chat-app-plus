@@ -1,7 +1,7 @@
 import socket
 import selectors
 from collections import defaultdict
-from _thread import *
+import threading
 from utils import *
 import os
 
@@ -45,10 +45,10 @@ def service_connection(clientSocket):
             status = UNKNOWN_ERROR
             responseHeader = None
             responseBody = None
-            print(f">client issued operation code {op}")
+            print(f"> client issued operation code {op}")
 
             if op == OP_REGISTER:
-                print(">>registration requested")
+                print(">> registration requested")
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 if username in registeredUsers:
                     print(f"{username} is already registered")
@@ -58,7 +58,7 @@ def service_connection(clientSocket):
                     print(f"{username} successfully registered")
                     status = REGISTER_OK
             elif op == OP_LOGIN:
-                print(">>login requested")
+                print(">> login requested")
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 if username in registeredUsers:
                     if username in userToSocket:
@@ -70,7 +70,7 @@ def service_connection(clientSocket):
                         # on login we deliver all undelivered messages
                         numUndelivered = len(messages[username])
                         if numUndelivered > 0:
-                            print(f"{username} successfully logged in, {numUndelivered} unread messages")
+                            print(f"{username} successfully logged in, {numUndelivered} unread message(s)")
                             status = LOGIN_OK_UNREAD_MSG
                             responseHeader = numUndelivered
                             responseBody = "\n".join(messages[username])
@@ -83,19 +83,19 @@ def service_connection(clientSocket):
                     print(f"{username} is not registered")
                     status = LOGIN_NOT_REGISTERED
             elif op == OP_SEARCH:
-                print(">>search requested")
+                print(">> search requested")
                 query = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 matched = searchUsernames(list(registeredUsers), query)
                 if matched:
                     responseHeader = len(matched)
                     responseBody = "|".join(matched)
-                    print(f"search executed, {responseHeader} results")
+                    print(f"search executed, {responseHeader} result(s)")
                     status = SEARCH_OK
                 else:
                     print(f"search executed, no results")
                     status = SEARCH_NO_RESULTS
             elif op == OP_SEND:
-                print(">>send requested")
+                print(">> send requested")
                 messageRaw = clientSocket.recv(
                     MESSAGE_LENGTH + 
                     2 * USERNAME_LENGTH + 
@@ -119,19 +119,19 @@ def service_connection(clientSocket):
                     messages[recipient].append(f"{sender}|{message}")
                     status = SEND_OK_BUFFERED
             elif op == OP_LOGOUT:
-                print(">>logout requested")
+                print(">> logout requested")
                 userToLogout = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 del userToSocket[userToLogout]
                 status = LOGOUT_OK
             elif op == OP_DELETE:
-                print(">>delete requested")
+                print(">> delete requested")
                 userToDelete = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 del userToSocket[userToDelete]
                 registeredUsers.remove(userToDelete)
                 status = DELETE_OK
             else:
                 # we should never get here
-                print(">>unknown operation issued")
+                print(">> unknown operation issued")
                 status = BAD_OPERATION
             toSend = status.to_bytes(CODE_LENGTH, "big")
             if responseHeader and responseBody:
@@ -149,16 +149,19 @@ while True:
     try:
         c, addr = sock.accept()  
     except KeyboardInterrupt:
-        print("\nCaught interrupt, shutting down server")
+        print("\ncaught interrupt, shutting down server")
         for c in userToSocket.values():
             c.close()
         sock.close()
         break 
     except:
-        print("Failed to accept socket connection, shutting down server")
+        print("failed to accept socket connection, shutting down server")
         break
-    print(f"Connected to new client {addr[0]}:{addr[1]}")
+    print(f"connected to new client {addr[0]}:{addr[1]}")
 
     # start a new thread and return its identifier
-    t = start_new_thread(service_connection, (c,))
-    threads.append(t)
+    # t = start_new_thread(service_connection, (c,))
+    # threads.append(t)
+    servicer = threading.Thread(target=service_connection, args=(c,))
+    servicer.daemon = True
+    servicer.start()

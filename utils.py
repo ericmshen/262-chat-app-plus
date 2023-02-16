@@ -58,7 +58,6 @@ def parseMessages(message : str) -> str:
     for msg in messages:
         messageLst = msg.split("|")
         retMsg += f"{messageLst[0]}: {messageLst[1]} \n"
-
     return retMsg
 
 def parseSearchResults(result : str) -> str:

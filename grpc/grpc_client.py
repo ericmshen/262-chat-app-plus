@@ -26,8 +26,10 @@ def run(stub:messageservice_pb2_grpc.MessageServiceStub):
                 print("<< usernames may not be blank, must be under 50 characters, and must be alphanumeric, please try again")
                 continue
             response = stub.Register(UsernameRequest(username=username_))
+            if response.statusCode == REGISTER_USERNAME_EXISTS:
+                print(f"<< {username} is already registered, please login")
+                username = None
             
-
 def test(stub:messageservice_pb2_grpc.MessageServiceStub):
     # test send message
     print("Sending invalid login...")
