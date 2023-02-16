@@ -135,5 +135,5 @@ if __name__ == '__main__':
     try:
         serve()
     except KeyboardInterrupt:
-        print("\nKeyboard interrupt detected, server shutting down")
+        print("\nCaught interrupt, server shutting down")
         sys.exit(0)

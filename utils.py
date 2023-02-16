@@ -27,11 +27,20 @@ SEND = 4
 LOGOUT = 5
 DELETE = 6
 
+commandToInt = {
+    "register" : REGISTER,
+    "login" : LOGIN,
+    "search" : SEARCH,
+    "send" : SEND,
+    "logout" : LOGOUT,
+    "delete" : DELETE,
+}
+
 # consts
 MESSAGE_LENGTH = 262
 USERNAME_LENGTH = 50
 DELIMITER_LENGTH = 1
-OPCODE_LENGTH = 1
+CODE_LENGTH = 1
 MSG_HEADER_LENGTH = 2
 
 
