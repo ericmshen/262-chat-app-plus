@@ -3,37 +3,41 @@ import re
 import string
 
 # operation codes
-REGISTRATION_OK = 1
-USERNAME_EXISTS = 2
+REGISTER_OK = 1
+REGISTER_USERNAME_EXISTS = 2
 LOGIN_OK_NO_UNREAD_MSG = 8
 LOGIN_OK_UNREAD_MSG = 9
-NOT_REGISTERED = 10
-ALREADY_LOGGED_IN = 11
+LOGIN_NOT_REGISTERED = 10
+LOGIN_ALREADY_LOGGED_IN = 11
 SEARCH_OK = 16
-NO_RESULTS = 17
-SENT_INSTANT_OK = 24
-SENT_CACHED_OK = 25
-RECIPIENT_DNE = 26
-RECEIVED_INSTANT_OK = 32
+SEARCH_NO_RESULTS = 17
+SEND_OK_DELIVERED = 24
+SEND_OK_BUFFERED = 25
+SEND_RECIPIENT_DNE = 26
+RECEIVE_OK = 32
 LOGOUT_OK = 40
 DELETE_OK = 48
 UNKNOWN_ERROR = 127
 
-# command codes
-REGISTER = 1
-LOGIN = 2
-SEARCH = 3
-SEND = 4
-LOGOUT = 5
-DELETE = 6
+# operation codes
+OP_REGISTER = 1
+OP_LOGIN = 2
+OP_SEARCH = 3
+OP_SEND = 4
+OP_LOGOUT = 5
+OP_DELETE = 6
+OP_DISCONNECT = 7
 
-commandToInt = {
-    "register" : REGISTER,
-    "login" : LOGIN,
-    "search" : SEARCH,
-    "send" : SEND,
-    "logout" : LOGOUT,
-    "delete" : DELETE,
+commandToOpcode = {
+    "register" : OP_REGISTER,
+    "login" : OP_LOGIN,
+    "search" : OP_SEARCH,
+    "send" : OP_SEND,
+    "logout" : OP_LOGOUT,
+    "delete" : OP_DELETE,
+    "quit" : OP_DISCONNECT,
+    "bye" : OP_DISCONNECT,
+    "disconnect" : OP_DISCONNECT,
 }
 
 # consts

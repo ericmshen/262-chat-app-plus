@@ -13,11 +13,11 @@ query = None
 def run(stub:messageservice_pb2_grpc.MessageServiceStub):
     while True:
         query = input("").lower().strip()
-        if query not in commandToInt:
+        if query not in commandToOpcode:
             print("<< please type an actual command")
             continue
-        queryInt = commandToInt[query]
-        if queryInt == REGISTER:
+        queryInt = commandToOpcode[query]
+        if queryInt == OP_REGISTER:
             if username:
                 print(f"<< you are already logged in as {username}, please logout and try again")
                 continue

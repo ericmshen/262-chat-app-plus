@@ -30,61 +30,60 @@ def service_connection(clientSocket):
     try:
         while True:
             # read 1 byte for the command
-            # TODO: edge case where one client ^Cs and the other client tries sending to them
             # need to register a logout
             try:
-                command = clientSocket.recv(1)
+                op = clientSocket.recv(1)
             except:
                 print("detected client disconnect, closing connection")
                 clientSocket.close()
                 return
-            command = int.from_bytes(command, "big")
-            print(f"client issues command {command}")
-            if not command:
+            op = int.from_bytes(op, "big")
+            if not op:
                 print("detected client disconnect, closing connection")
                 clientSocket.close()
                 return
-            opcode = UNKNOWN_ERROR
+            status = UNKNOWN_ERROR
             responseHeader = None
             responseBody = None
+            print(f"client issued operation code {op}")
 
-            if command == REGISTER:
+            if op == OP_REGISTER:
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 if username in registeredUsers:
-                    opcode = USERNAME_EXISTS
+                    status = REGISTER_USERNAME_EXISTS
                 else:
                     registeredUsers.add(username)
-                    opcode = REGISTRATION_OK
-            elif command == LOGIN:
+                    status = REGISTER_OK
+            elif op == OP_LOGIN:
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 if username in registeredUsers:
                     if username in userToSocket:
-                        opcode = ALREADY_LOGGED_IN
+                        status = LOGIN_ALREADY_LOGGED_IN
                     else:
                         # register the socket under the current user's username
                         userToSocket[username] = clientSocket
                         # on login we deliver all undelivered messages
                         numUndelivered = len(messages[username])
                         if numUndelivered > 0:
-                            opcode = LOGIN_OK_UNREAD_MSG
+                            status = LOGIN_OK_UNREAD_MSG
                             responseHeader = numUndelivered
                             responseBody = "\n".join(messages[username])
                             # clear the cache
                             messages[username] = []
                         else:
-                            opcode = LOGIN_OK_NO_UNREAD_MSG
+                            status = LOGIN_OK_NO_UNREAD_MSG
                 else:
-                    opcode = NOT_REGISTERED
-            elif command == SEARCH:
+                    status = LOGIN_NOT_REGISTERED
+            elif op == OP_SEARCH:
                 query = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 matched = searchUsernames(list(registeredUsers), query)
                 if matched:
                     responseHeader = len(matched)
                     responseBody = "|".join(matched)
-                    opcode = SEARCH_OK
+                    status = SEARCH_OK
                 else:
-                    opcode = NO_RESULTS
-            elif command == SEND:
+                    status = SEARCH_NO_RESULTS
+            elif op == OP_SEND:
                 messageRaw = clientSocket.recv(
                     MESSAGE_LENGTH + 
                     2 * USERNAME_LENGTH + 
@@ -93,32 +92,32 @@ def service_connection(clientSocket):
                 sender, recipient, message = messageRaw[0], messageRaw[1], messageRaw[2]
                 # check if the recipient exists
                 if recipient not in registeredUsers:
-                    opcode = RECIPIENT_DNE
+                    status = SEND_RECIPIENT_DNE
                 # check if the recipient is logged in, and if so deliver instantaneously
                 elif recipient in userToSocket:
                     userToSocket[recipient].sendall(
-                        RECEIVED_INSTANT_OK.to_bytes(1, "big") +
+                        RECEIVE_OK.to_bytes(1, "big") +
                         bytes(f"{sender}|{message}", 'ascii')
                     )
-                    opcode = SENT_INSTANT_OK
+                    status = SEND_OK_DELIVERED
                 # otherwise, store the message
                 else:
                     messages[recipient].append(f"{sender}|{message}")
-                    opcode = SENT_CACHED_OK
-            elif command == LOGOUT:
+                    status = SEND_OK_BUFFERED
+            elif op == OP_LOGOUT:
                 userToLogout = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 del userToSocket[userToLogout]
-                opcode = LOGOUT_OK
-            elif command == DELETE:
+                status = LOGOUT_OK
+            elif op == OP_DELETE:
                 userToDelete = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
                 del userToSocket[userToDelete]
                 registeredUsers.remove(userToDelete)
-                opcode = DELETE_OK
+                status = DELETE_OK
             else:
                 # we should never get here
                 print("error in the command")
 
-            toSend = opcode.to_bytes(CODE_LENGTH, "big")
+            toSend = status.to_bytes(CODE_LENGTH, "big")
             if responseHeader and responseBody:
                 toSend += responseHeader.to_bytes(MSG_HEADER_LENGTH, "big")
                 toSend += bytes(responseBody, 'ascii')
@@ -127,7 +126,6 @@ def service_connection(clientSocket):
     except:
         # TODO: unsure what to do here - what sort of errors could the system throw? we should handle each one differently
         pass
-
 
 # a forever loop until program exit
 while True:
@@ -148,5 +146,3 @@ while True:
     # start a new thread and return its identifier
     t = start_new_thread(service_connection, (c,))
     threads.append(t)
-
-

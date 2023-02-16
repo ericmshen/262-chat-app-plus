@@ -24,20 +24,20 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
         print(f"Received register request from {username}")
         if username in registeredUsers:
             print("Username already exists!")
-            return StatusCodeResponse(statusCode=USERNAME_EXISTS)
+            return StatusCodeResponse(statusCode=REGISTER_USERNAME_EXISTS)
         registeredUsers.add(request.username)
         print("Registeration successful")
-        return StatusCodeResponse(statusCode=REGISTRATION_OK)
+        return StatusCodeResponse(statusCode=REGISTER_OK)
     
     def Login(self, request, context):
         username = request.username
         print(f"Received login request from {username}")
         if username not in registeredUsers:
             print("Username is not registered!")
-            return LoginResponse(statusCode=NOT_REGISTERED)
+            return LoginResponse(statusCode=LOGIN_NOT_REGISTERED)
         if username in activeUsers:
             print("Username is already logged in!")
-            return LoginResponse(statusCode=ALREADY_LOGGED_IN)
+            return LoginResponse(statusCode=LOGIN_ALREADY_LOGGED_IN)
         activeUsers[username] = Queue()
         numUndelivered = len(messageBuffer[username])
         if numUndelivered == 0:
@@ -70,7 +70,7 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
         print(f"Received search request with query {query}") 
         results = searchUsernames(list(registeredUsers), query)
         if len(results) == 0:
-            return SearchResponse(statusCode=NO_RESULTS)
+            return SearchResponse(statusCode=SEARCH_NO_RESULTS)
         resp = SearchResponse(statusCode=SEARCH_OK)
         resp.results.extend(results)
         return resp
@@ -82,14 +82,14 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
         if receiver not in activeUsers:
             print("Receiver is not logged in, buffering message")
             messageBuffer[receiver].append(formattedMessage)
-            return StatusCodeResponse(statusCode=SENT_CACHED_OK)
+            return StatusCodeResponse(statusCode=SEND_OK_BUFFERED)
         print("Receiver is logged in, sending message")
         try:
             activeUsers[receiver].put(formattedMessage)
         except:
             print("Unknown error in sending message!")
             return StatusCodeResponse(statusCode=UNKNOWN_ERROR)
-        return StatusCodeResponse(statusCode=SENT_INSTANT_OK)
+        return StatusCodeResponse(statusCode=SEND_OK_DELIVERED)
     
     def Logout(self, request, context):
         username = request.username
