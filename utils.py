@@ -3,6 +3,15 @@ import re
 import string
 
 # operation codes
+OP_REGISTER = 1
+OP_LOGIN = 2
+OP_SEARCH = 3
+OP_SEND = 4
+OP_LOGOUT = 5
+OP_DELETE = 6
+OP_DISCONNECT = 7
+
+# server status codes
 REGISTER_OK = 1
 REGISTER_USERNAME_EXISTS = 2
 LOGIN_OK_NO_UNREAD_MSG = 8
@@ -19,15 +28,6 @@ LOGOUT_OK = 40
 DELETE_OK = 48
 BAD_OPERATION = 126
 UNKNOWN_ERROR = 127
-
-# operation codes
-OP_REGISTER = 1
-OP_LOGIN = 2
-OP_SEARCH = 3
-OP_SEND = 4
-OP_LOGOUT = 5
-OP_DELETE = 6
-OP_DISCONNECT = 7
 
 commandToOpcode = {
     "register" : OP_REGISTER,
@@ -48,7 +48,7 @@ DELIMITER_LENGTH = 1
 CODE_LENGTH = 1
 MSG_HEADER_LENGTH = 2
 
-
+# helper functions
 def formatMessage(sender : str, recipient: str, messageBody: str):
     return f"{sender}|{recipient}|{messageBody}"
 

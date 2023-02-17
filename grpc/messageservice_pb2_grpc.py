@@ -22,7 +22,7 @@ class MessageServiceStub(object):
         self.Login = channel.unary_unary(
                 '/MessageService/Login',
                 request_serializer=messageservice__pb2.UsernameRequest.SerializeToString,
-                response_deserializer=messageservice__pb2.StatusCodeResponse.FromString,
+                response_deserializer=messageservice__pb2.LoginResponse.FromString,
                 )
         self.Subscribe = channel.unary_stream(
                 '/MessageService/Subscribe',
@@ -107,7 +107,7 @@ def add_MessageServiceServicer_to_server(servicer, server):
             'Login': grpc.unary_unary_rpc_method_handler(
                     servicer.Login,
                     request_deserializer=messageservice__pb2.UsernameRequest.FromString,
-                    response_serializer=messageservice__pb2.StatusCodeResponse.SerializeToString,
+                    response_serializer=messageservice__pb2.LoginResponse.SerializeToString,
             ),
             'Subscribe': grpc.unary_stream_rpc_method_handler(
                     servicer.Subscribe,
@@ -174,7 +174,7 @@ class MessageService(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/MessageService/Login',
             messageservice__pb2.UsernameRequest.SerializeToString,
-            messageservice__pb2.StatusCodeResponse.FromString,
+            messageservice__pb2.LoginResponse.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 

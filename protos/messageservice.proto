@@ -2,7 +2,7 @@ syntax = "proto3";
 
 service MessageService {
     rpc Register(UsernameRequest) returns (StatusCodeResponse) {}
-    rpc Login(UsernameRequest) returns (StatusCodeResponse) {}
+    rpc Login(UsernameRequest) returns (LoginResponse) {}
     rpc Subscribe(UsernameRequest) returns (stream Message) {}
     rpc Search(SearchRequest) returns (SearchResponse) {}
     rpc Send(MessageRequest) returns (StatusCodeResponse) {}

@@ -38,10 +38,10 @@ def listen():
             # quit the program
             os._exit(0)
         if code == REGISTER_OK:
-            print(f"<< {username} successfully registered. please login")
+            print(f"<< {username} successfully registered, please login")
             username = None
         elif code == REGISTER_USERNAME_EXISTS:
-            print(f"<< {username} is already registered. please login")
+            print(f"<< {username} is already registered, please login")
             username = None
         elif code == LOGIN_OK_NO_UNREAD_MSG:
             print(f"<< welcome {username}, you have no new messages")
@@ -64,7 +64,7 @@ def listen():
             numResults = sock.recv(MSG_HEADER_LENGTH)
             numResults = int.from_bytes(numResults, "big")
             if numResults == 1:
-                print(f"<< 1 username matched your query:")
+                print("<< 1 username matched your query:")
             else:
                 print(f"{numResults} usernames matched your query:")
             results = sock.recv(numResults * (USERNAME_LENGTH + DELIMITER_LENGTH)).decode('ascii')
@@ -72,7 +72,7 @@ def listen():
         elif code == SEARCH_NO_RESULTS:
             print("<< no usernames matched your query")
         elif code == SEND_OK_DELIVERED:
-            print(f"<< delivered")
+            print("<< message delivered")
         elif code == SEND_OK_BUFFERED:
             print(f"<< your message to {recipient} will be delivered when they log in")
         elif code == SEND_RECIPIENT_DNE:
@@ -81,13 +81,15 @@ def listen():
             message = sock.recv(MESSAGE_LENGTH + USERNAME_LENGTH + DELIMITER_LENGTH).decode('ascii')
             print(parseMessages(message), end="")
         elif code == LOGOUT_OK:
-            print(f"<< successfully logged out")
+            print("<< successfully logged out")
             username = None
         elif code == DELETE_OK:
-            print(f"<< succesfully deleted account")
+            print("<< succesfully deleted account")
             username = None
         elif code == UNKNOWN_ERROR:
-            print(f"<< unknown error")
+            print("<< unknown error")
+        else:
+            print("<< unexpected response from server")
             
 def interpret():
     global username, recipient
@@ -104,14 +106,14 @@ def interpret():
                 continue
             usernameInput = input(">> please enter username: ").strip()
             if not isValidUsername(usernameInput):
-                print("<< usernames may not be blank, must be under 50 characters, and must be alphanumeric, please try again")
+                print("<< usernames must not be blank, must be under 50 characters, and must be alphanumeric, please try again")
                 continue
             messageBody = usernameInput
             username = usernameInput
         elif opcode == OP_SEARCH:
             query = input(">> enter query: ").strip()
             if not isValidQuery(query):
-                print("<< search queries may not be blank, must be under 50 characters, and must be comprised of alphanumerics and wildcards (*), please try again")
+                print("<< search queries must not be blank, must be under 50 characters, and must be comprised of alphanumerics and wildcards (*), please try again")
                 continue
             messageBody = query
         elif opcode == OP_SEND:
@@ -121,9 +123,10 @@ def interpret():
             recipientInput = input(">> username of recipient: ")
             if not isValidUsername(recipientInput):
                 print("<< invalid username, please try again")
+                continue
             message = input(">> message: ").strip()
             if not isValidMessage(message):
-                print("<< messages must not contain the newline character or the '|' character, may not be blank, and must be under 262 characters, please try again")
+                print("<< messages must not contain the newline character or the '|' character, must not be blank, and must be under 262 characters, please try again")
             recipient = recipientInput
             messageBody = formatMessage(username, recipientInput, message)
         elif opcode in { OP_LOGOUT, OP_DELETE } :
@@ -173,7 +176,7 @@ def run():
 
 if __name__ == "__main__":
     if len(sys.argv) != 3:
-        print(f"Usage: {sys.argv[0]} <host> <port>")
+        print(f"usage: {sys.argv[0]} <host> <port>")
         sys.exit(1)
 
     host, port = sys.argv[1], int(sys.argv[2])
