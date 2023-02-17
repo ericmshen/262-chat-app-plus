@@ -15,9 +15,6 @@ recipient = None
 # Connected socket.
 sock = None
 
-# Command read from input.
-command = None
-
 def listen():
     global username
     while True:
@@ -33,7 +30,7 @@ def listen():
             os._exit(0)
         # if the server disconnects, it sends back a None or 0
         if not code:
-            print("server has disconnected, exiting client")
+            print("server disconnected, exiting client")
             sock.close()
             # quit the program
             os._exit(0)
@@ -76,7 +73,7 @@ def listen():
         elif code == SEND_OK_BUFFERED:
             print(f"<< your message to {recipient} will be delivered when they log in")
         elif code == SEND_RECIPIENT_DNE:
-            print(f"<< the user {recipient} does not exist")
+            print(f"<< the user {recipient} does not exist, or has deleted their account")
         elif code == RECEIVE_OK:
             message = sock.recv(MESSAGE_LENGTH + USERNAME_LENGTH + DELIMITER_LENGTH).decode('ascii')
             print(parseMessages(message), end="")
@@ -84,15 +81,16 @@ def listen():
             print("<< successfully logged out")
             username = None
         elif code == DELETE_OK:
-            print("<< succesfully deleted account")
+            print("<< succesfully logged out and deleted account")
             username = None
         elif code == UNKNOWN_ERROR:
             print("<< unknown error")
         else:
             print("<< unexpected response from server")
             
-def interpret():
+def serve():
     global username, recipient
+    print(">> type a command to begin")
     while True:
         messageBody = None
         command = input("").lower().strip()
@@ -120,13 +118,14 @@ def interpret():
             if not username:
                 print(">> you must be logged in to send a message")
                 continue
-            recipientInput = input(">> username of recipient: ")
+            recipientInput = input(">> username of recipient: ").strip()
             if not isValidUsername(recipientInput):
-                print("<< invalid username, please try again")
+                print("<< usernames must not be blank, must be under 50 characters, and must be alphanumeric, please try again")
                 continue
             message = input(">> message: ").strip()
             if not isValidMessage(message):
                 print("<< messages must not contain the newline character or the '|' character, must not be blank, and must be under 262 characters, please try again")
+                continue
             recipient = recipientInput
             messageBody = formatMessage(username, recipientInput, message)
         elif opcode in { OP_LOGOUT, OP_DELETE } :
@@ -160,13 +159,13 @@ def run():
         
         # run interpret, which handles user input, parsing, and requests to server, 
         # in the main thread
-        interpret()
+        serve()
         
     # users may quit via a KeyboardInterrupt, or by typing a command for OP_DISCONNECT
     except KeyboardInterrupt:
         print("\n<< caught interrupt, shutting down connection")
         if username:
-            print(f"automatically logging out {username}")
+            print(f"automatically logging out")
             opcode = OP_LOGOUT
             sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(username, 'ascii'))
             username = None
@@ -179,9 +178,11 @@ if __name__ == "__main__":
         print(f"usage: {sys.argv[0]} <host> <port>")
         sys.exit(1)
 
+    print("starting client...")
+    
     host, port = sys.argv[1], int(sys.argv[2])
     serverAddr = (host, port)
-    print(f"starting connection to {serverAddr}")
+    print(f"starting connection to {host}:{port}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.connect_ex(serverAddr)
     run()

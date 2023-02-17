@@ -3,7 +3,7 @@ import selectors
 from collections import defaultdict
 import threading
 from utils import *
-import os
+import sys
 
 sel = selectors.DefaultSelector()
 # maintain a dictionary of messages
@@ -16,7 +16,6 @@ registeredUsers = set()
 userToSocket = dict()
 
 # allow any incoming connections on port 22067
-# TODO: make port specifiable via command line
 host, port = "0.0.0.0", 22067
 
 def service_connection(clientSocket):
@@ -33,7 +32,7 @@ def service_connection(clientSocket):
         op = int.from_bytes(op, "big")
         # if the client disconnects, it sends back a None or 0
         if not op:
-            print("detected client disconnect, closing connection")
+            print("client disconnected, closing connection")
             clientSocket.close()
             return
         status = UNKNOWN_ERROR
@@ -98,7 +97,7 @@ def service_connection(clientSocket):
             sender, recipient, message = messageRaw[0], messageRaw[1], messageRaw[2]
             # check if the recipient exists
             if recipient not in registeredUsers:
-                print(f"recipient {recipient} is not registered")
+                print(f"recipient {recipient} not found")
                 status = SEND_RECIPIENT_DNE
             # check if the recipient is logged in, and if so deliver instantaneously
             elif recipient in userToSocket:
@@ -122,14 +121,6 @@ def service_connection(clientSocket):
             print(">> delete requested")
             userToDelete = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             del userToSocket[userToDelete]
-            for user, messageList in messageBuffer:
-                newList = []
-                for message in messageList:
-                    sender, body = message.split("|")
-                    if sender == userToDelete:
-                        message = f"<deleted user>|{body}"
-                newList.append(message)
-                messageBuffer[user] = newList
             registeredUsers.remove(userToDelete)
             status = DELETE_OK
         else:
@@ -144,14 +135,21 @@ def service_connection(clientSocket):
         print("server response given")
 
 if __name__ == "__main__":
+    if len(sys.argv) > 2:
+        print(f"usage: {sys.argv[0]} <optional port>")
+        sys.exit(1)
+    if len(sys.argv) == 2:
+        port = int(sys.argv[1])
+        
+    print('starting server...')
+        
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((host, port))
-    print(f"server hostname {socket.gethostname()}")
-    print("socket bound to port", port)
+    print(f"server started, listening on host {socket.gethostname()} and port {port}")
 
     # put the socket into listening mode
     sock.listen(10)
-    print("socket is listening")
+    print("server is listening")
     # print hostname for client connection
 
     # a forever loop until program exit
