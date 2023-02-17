@@ -27,7 +27,7 @@ message SearchRequest {
 // A sender, receiver, and message are required
 message MessageRequest {
     string sender = 1;
-    string receiver = 2;
+    string recipient = 2;
     string body = 3;
 }
 

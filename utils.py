@@ -83,6 +83,7 @@ def isValidQuery(query : str):
     )
 
 def isValidMessage(message : str):
+    # TODO: message must be ASCII-encodable
     return (
         message and
         "\n" not in message and "|" not in message and

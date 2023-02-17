@@ -22,14 +22,14 @@ class Message(_message.Message):
     def __init__(self, sender: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
 
 class MessageRequest(_message.Message):
-    __slots__ = ["body", "receiver", "sender"]
+    __slots__ = ["body", "recipient", "sender"]
     BODY_FIELD_NUMBER: _ClassVar[int]
-    RECEIVER_FIELD_NUMBER: _ClassVar[int]
+    RECIPIENT_FIELD_NUMBER: _ClassVar[int]
     SENDER_FIELD_NUMBER: _ClassVar[int]
     body: str
-    receiver: str
+    recipient: str
     sender: str
-    def __init__(self, sender: _Optional[str] = ..., receiver: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
+    def __init__(self, sender: _Optional[str] = ..., recipient: _Optional[str] = ..., body: _Optional[str] = ...) -> None: ...
 
 class SearchRequest(_message.Message):
     __slots__ = ["query"]

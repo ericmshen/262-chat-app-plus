@@ -69,7 +69,7 @@ def listen():
         elif code == SEARCH_NO_RESULTS:
             print("<< no usernames matched your query")
         elif code == SEND_OK_DELIVERED:
-            print("<< message delivered")
+            print(f"<< message delivered to {recipient}")
         elif code == SEND_OK_BUFFERED:
             print(f"<< your message to {recipient} will be delivered when they log in")
         elif code == SEND_RECIPIENT_DNE:
@@ -90,7 +90,7 @@ def listen():
             
 def serve():
     global username, recipient
-    print(">> type a command to begin")
+    print(">> type a command to begin: {register, login, search, send, logout, delete, quit}")
     while True:
         messageBody = None
         command = input("").lower().strip()
@@ -124,7 +124,7 @@ def serve():
                 continue
             message = input(">> message: ").strip()
             if not isValidMessage(message):
-                print("<< messages must not contain the newline character or the '|' character, must not be blank, and must be under 262 characters, please try again")
+                print("<< messages must contain only ASCII (English) characters, not contain newlines or '|', must not be blank, and must be under 262 characters, please try again")
                 continue
             recipient = recipientInput
             messageBody = formatMessage(username, recipientInput, message)
@@ -134,7 +134,7 @@ def serve():
                 continue
             usernameInput = input(f">> enter username to confirm {command}: ").strip()
             if not isValidUsername(usernameInput):
-                print("<< invalid username")
+                print("<< usernames must not be blank, must be under 50 characters, and must be alphanumeric, please try again")
                 continue
             if usernameInput != username:
                 print("<< the username typed does not match your username, please try again")
