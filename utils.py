@@ -2,6 +2,7 @@ from typing import List
 import re
 import string
 
+# *** CONSTS ***
 # operation codes
 OP_REGISTER = 1
 OP_LOGIN = 2
@@ -29,6 +30,7 @@ DELETE_OK = 48
 BAD_OPERATION = 126
 UNKNOWN_ERROR = 127
 
+# map strings to operation codes for parsing of user input
 commandToOpcode = {
     "register" : OP_REGISTER,
     "login" : OP_LOGIN,
@@ -41,30 +43,37 @@ commandToOpcode = {
     "disconnect" : OP_DISCONNECT,
 }
 
-# consts
+# constants used in sending messages
 MESSAGE_LENGTH = 262
 USERNAME_LENGTH = 50
 DELIMITER_LENGTH = 1
 CODE_LENGTH = 1
 MSG_HEADER_LENGTH = 2
 
-# helper functions
-def formatMessage(sender : str, recipient: str, messageBody: str):
-    return f"{sender}|{recipient}|{messageBody}"
+# *** HELPER FUNCTIONS ***
+# take a sender, recipient, and message body and return a string that represents
+# the encoding of the message sent over the socket
+def formatMessage(sender : str, recipient: str, body: str):
+    return f"{sender}|{recipient}|{body}"
 
-def parseMessages(message : str) -> str:
-    messages = message.split("\n")
+# complementary to the above: parses a string of incoming messages into a form 
+# that can be printed in the terminal, with messages separated by newlines
+def parseMessages(input : str) -> str:
+    messages = input.split("\n")
     retMsg = ""
     for msg in messages:
+        # <receiver>|<message> => <receiver>: <message>
         messageLst = msg.split("|")
         retMsg += f"{messageLst[0]}: {messageLst[1]} \n"
     return retMsg
 
+# ibid for search results: expands separators (|s) into newlines
 def parseSearchResults(result : str) -> str:
     results = result.split("|")
     return "\n".join(results)
 
-# wildcard search interprets * as zero or more of ANY character
+# given a list of total usernames and a query, returns the usernames matching
+# the query; note: wildcard search interprets * as ZERO or more of ANY character
 def searchUsernames(usernames : List[str], query : str):
     if len(usernames) == 0: return []
     if len(query) == 0:
@@ -72,26 +81,35 @@ def searchUsernames(usernames : List[str], query : str):
     q = query.replace("*", ".*")
     return list(filter(lambda x: re.match(q, x), usernames))
 
+# check if a username is valid: it must not be blank, be alphanumeric, and be
+# no more than 50 characters
 def isValidUsername(username : str):
     return username and username.isalnum() and len(username) <= 50 
 
+# similar to isValidUsername, but for queries (can also handle *)
 def isValidQuery(query : str):
     return ( 
         query and 
         set(query).issubset(set(string.ascii_lowercase + string.digits + '*')) and 
-        len(query) <= 50 
+        len(query) <= USERNAME_LENGTH 
     )
 
+# messages must contain only ASCII (English) characters, not contain newlines 
+# or separators (|s), and be no more than 262 characters
 def isValidMessage(message : str):
-    # TODO: message must be ASCII-encodable
-    return (
-        message and
-        "\n" not in message and "|" not in message and
-        len(message) <= 262
-    )
+    # simple way to check if message is ASCII: try encoding it
+    try:
+        message.encode("ascii")
+        return (
+            message and
+            "\n" not in message and "|" not in message and
+            len(message) <= MESSAGE_LENGTH
+        )
+    except UnicodeEncodeError:
+        return False
 
 # TODO: move tests elsewhere
-if __name__ == "__main__":
+def utilsTests():
     print(formatMessage("sender1", "recipient1", "message1"))
     print(formatMessage("sender1", "recipient1", "message2"))
     print(formatMessage("sender1", "recipient1", "message3"))
@@ -100,3 +118,6 @@ if __name__ == "__main__":
     print(searchUsernames(["sender1", "sender2", "sender3"], "c*"))
     print(searchUsernames(["sender1", "sender2", "sender3"], "*1"))
     print(searchUsernames(["sender1", "sender2", "sender3"], "sender"))
+
+if __name__ == "__main__":
+    utilsTests()

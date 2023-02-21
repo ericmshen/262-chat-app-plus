@@ -1,12 +1,32 @@
 syntax = "proto3";
 
+// MessageService handles all tasks.
 service MessageService {
+    // Let a user register with a given username.
     rpc Register(UsernameRequest) returns (StatusCodeResponse) {}
+
+    // Let a user login with a given username, delivering any unread messages.
+    // Immediately after logging in, in order to instantly receive new messages
+    // that are sent, a client should call the Subscribe rpc.
     rpc Login(UsernameRequest) returns (LoginResponse) {}
+
+    // Opens a stream of communication from the server to the user, delivering
+    // unread messages as they are sent.
     rpc Subscribe(UsernameRequest) returns (stream Message) {}
+
+    // Let a user search for usernames using text/wildcard search.
     rpc Search(SearchRequest) returns (SearchResponse) {}
+
+    // Let a user send a message to another user (or themselves for whatever reason).
+    // The message will be delivered instantly if the recipient is logged in, or
+    // buffered to be delivered upon the recipient's next login.
     rpc Send(MessageRequest) returns (StatusCodeResponse) {}
+
+    // Let a user logout with a given username.
     rpc Logout(UsernameRequest) returns (StatusCodeResponse) {}
+
+    // Let a user delete their account with a given username. The user will be
+    // automatically logged out.
     rpc Delete(UsernameRequest) returns (StatusCodeResponse) {}
 }
 
@@ -18,7 +38,7 @@ message UsernameRequest {
 }
 
 // Proto used for search
-// Only a query string, if any, is required
+// Only a query string is required
 message SearchRequest {
     string query = 1;
 }
@@ -32,15 +52,16 @@ message MessageRequest {
 }
 
 // *** Protos used for server responses ***
-// Proto used for (an already-determined) client receiving messages
-// A sender and message are required
+// Proto used for (an already-specified) client receiving messages
+// A sender and message body are required
 message Message {
     string sender = 1;
     string body = 2;
 }
 
-// Proto used for register, logout, and delete
+// Proto used for register, send (to the sender), logout, and delete
 // Only a status code is required
+// The specific types of possible status codes are given in utils.py
 message StatusCodeResponse {
     int32 statusCode = 1;
 }

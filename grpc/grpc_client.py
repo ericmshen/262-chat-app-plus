@@ -10,6 +10,9 @@ username = None
 
 def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
     global username
+    
+    # TODO: for convenience, can first ping stub to see if server is online
+    # TODO: try catch everything
     print(">> type a command to begin: {register, login, search, send, logout, delete, quit}")
     while True:
         command = input("").lower().strip()
@@ -27,11 +30,13 @@ def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
                 continue
             response = stub.Register(UsernameRequest(username=usernameInput))
             if response.statusCode == REGISTER_OK:
-                print(f"<< {username} is already registered, please login")
+                print(f"<< {usernameInput} successfully registered, please login")
             elif response.statusCode == REGISTER_USERNAME_EXISTS:
-                print(f"<< {username} successfully registered, please login")
+                print(f"<< {usernameInput} is already registered, please login")
             else:
                 print("unexpected response from server")
+                
+        # TODO: spawn 
         elif opcode == OP_LOGIN:
             if username:
                 print(f"<< you are already logged in as {username}, please logout and try again")
@@ -154,6 +159,8 @@ def test(stub:messageservice_pb2_grpc.MessageServiceStub):
     print(f"Client received status code: {response.statusCode}")
 
 def startClient():
+    global username 
+    
     if len(sys.argv) != 3:
         print(f"Usage: {sys.argv[0]} <host> <port>")
         sys.exit(1)

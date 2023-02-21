@@ -5,6 +5,7 @@ import messageservice_pb2_grpc
 from collections import defaultdict
 import socket
 from queue import Queue
+import os
 
 import sys
 sys.path.append('..')
@@ -25,7 +26,7 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
             print("username already exists")
             return StatusCodeResponse(statusCode=REGISTER_USERNAME_EXISTS)
         registeredUsers.add(request.username)
-        print("registeration successful")
+        print("registration successful")
         return StatusCodeResponse(statusCode=REGISTER_OK)
     
     def Login(self, request, context):
@@ -50,6 +51,7 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
         messageBuffer[username] = []
         return LoginResponse(statusCode=LOGIN_OK_UNREAD_MSG, messages=unreadMessages)
         
+    # TODO: before shutdown, find some way to pass a EOF to client
     def Subscribe(self, request, context):
         username = request.username
         print(f"received subscribe request from {username}")
@@ -140,4 +142,5 @@ if __name__ == '__main__':
         serve(port)
     except KeyboardInterrupt:
         print("\ncaught interrupt, server shutting down")
-        sys.exit(0)
+        # TODO: before shutdown, find some way to pass a EOF to client
+        os._exit(0)
