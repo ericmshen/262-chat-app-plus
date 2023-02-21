@@ -17,7 +17,7 @@ import sys
 # each message is encoded as a string with the format "<sender>|<receiver>"
 messageBuffer = defaultdict(list)
 
-# keep a list of all opened threads to make sure they don't get GC'd
+# keep a list of all opened threads, to make sure they don't get GC'd (perhaps unnecessary)
 threads = []
 
 # keep track of all registered users
@@ -30,7 +30,7 @@ userToSocket = dict()
 # allow any incoming connections on port 22067 by default (port can be specified)
 host, port = "0.0.0.0", 22067
 
-# each individual thread runs this function communicate with its respective client
+# each individual thread runs this function to communicate with its respective client
 def service_connection(clientSocket):
     """ Services a client connection. Over the lifetime of the connection, it loops 
     and reads from the client socket. It first reads a 1-byte operation code 
@@ -186,6 +186,7 @@ def service_connection(clientSocket):
             # this is all that is needed to mark a user as logged out for the server
             else:
                 del userToSocket[userToLogout]
+                print(f"{userToLogout} logged out")
                 status = LOGOUT_OK
             
         # *** DELETE ***
@@ -204,6 +205,7 @@ def service_connection(clientSocket):
                 # the username no longer exists; note one can request a delete, but register
                 # again using the same username
                 registeredUsers.remove(userToDelete)
+                print(f"{userToDelete} deleted")
                 status = DELETE_OK
         
         # we should never get here
@@ -251,7 +253,7 @@ if __name__ == "__main__":
         try:
             c, addr = sock.accept()
             # TODO: possibly set a timeout here; must handle timeouts on client side
-            # c.settimeout(600.)
+            # c.settimeout(5.)
         # gracefully-ish handle a keyboard interrupt by closing the active sockets;
         # this will also notify the clients that the server connection has ended
         except KeyboardInterrupt:

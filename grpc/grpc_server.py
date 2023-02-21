@@ -11,7 +11,18 @@ import sys
 sys.path.append('..')
 from utils import *
 
+# gRPC's functionality helps us abstract away a few details compared to sockets: handling
+# threading, managing connections, etc. It allows us to write things in an arguably more
+# straightforward way, similar to an API implementation. However, because we don't have
+# a mapping of users to sockets and data is transfered through server calls, the way we 
+# send messages instantly is worked a bit differently: in addition to a buffer, for real-
+# time messaging we maintain a map from users to Queues. When a user logs in, they will
+# immediately "Subscribe" to a stream of messages, wherein the server reads from the 
+# Queue and yields incoming messages as they arrive.
+
+# allow any incoming connections on port 22068 by default (port can be specified)
 host, port = "0.0.0.0", "22068"
+
 # map of username (strings) to a list of messages they will receive when they log in
 # each message is stored as a string "<sender>|<message>"
 messageBuffer = defaultdict(list)
@@ -21,40 +32,40 @@ activeUsers = {}
 class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):        
     def Register(self, request, context):
         username = request.username
-        print(f"received register request from {username}")
+        print(f">> registration requested from {username}")
         if username in registeredUsers:
-            print("username already exists")
+            print(f"{username} is already registered")
             return StatusCodeResponse(statusCode=REGISTER_USERNAME_EXISTS)
         registeredUsers.add(request.username)
-        print("registration successful")
+        print(f"{username} successfully registered")
         return StatusCodeResponse(statusCode=REGISTER_OK)
     
     def Login(self, request, context):
         username = request.username
-        print(f"received login request from {username}")
+        print(f">> login requested from {username}")
         if username not in registeredUsers:
-            print("username is not registered")
+            print(f"{username} is not registered")
             return LoginResponse(statusCode=LOGIN_NOT_REGISTERED)
         if username in activeUsers:
-            print("username is already logged in")
+            print(f"{username} is already logged in")
             return LoginResponse(statusCode=LOGIN_ALREADY_LOGGED_IN)
         activeUsers[username] = Queue()
         numUndelivered = len(messageBuffer[username])
         if numUndelivered == 0:
-            print("login successful, no unread messages")
+            print(f"{username} successfully logged in, no unread messages")
             return LoginResponse(statusCode=LOGIN_OK_NO_UNREAD_MSG)
         unreadMessages = []
         for message in messageBuffer[username]:
             sender, body = message.split("|")
             unreadMessages.append(Message(sender=sender, body=body))
-        print(f"login successful, {len(unreadMessages)} unread messages")
+        print(f"{username} successfully logged in, {numUndelivered} unread message(s)")
         messageBuffer[username] = []
         return LoginResponse(statusCode=LOGIN_OK_UNREAD_MSG, messages=unreadMessages)
         
     # TODO: before shutdown, find some way to pass a EOF to client
     def Subscribe(self, request, context):
         username = request.username
-        print(f"received subscribe request from {username}")
+        print(f">> received subscribe request from {username}")
         while True:
             try:
                 message = activeUsers[username].get()
@@ -69,7 +80,7 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
    
     def Search(self, request, context):
         query = request.query
-        print(f"received search request with query {query}") 
+        print(f">> search requested with query {query}") 
         results = searchUsernames(list(registeredUsers), query)
         numResults = len(results)
         if numResults == 0:
@@ -82,16 +93,16 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
         
     def Send(self, request, context):
         sender, recipient, body = request.sender, request.recipient, request.body
-        print(f"received send request from {sender} to {recipient}")
+        print(f">> send requested from {sender} to {recipient}")
         formattedMessage = f"{sender}|{body}"
         if recipient not in registeredUsers:
-            print(f"{recipient} not found")
+            print(f"recipient {recipient} not found")
             return StatusCodeResponse(statusCode=SEND_RECIPIENT_DNE)
         if recipient not in activeUsers:
-            print(f"{recipient} is not logged in, buffering message")
+            print(f"buffered message from {sender} to {recipient}")
             messageBuffer[recipient].append(formattedMessage)
             return StatusCodeResponse(statusCode=SEND_OK_BUFFERED)
-        print(f"{recipient} is logged in, sending message")
+        print(f"sent message from {sender} to {recipient}")
         try:
             activeUsers[recipient].put(formattedMessage)
         except:
@@ -101,17 +112,18 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
     
     def Logout(self, request, context):
         userToLogout = request.username
-        print(f"received logout request from {userToLogout}") 
+        print(f">> logout requested from {userToLogout}") 
         # this shouldn't ever happen (client-side check that user is logged in)
         if userToLogout not in activeUsers:
             return StatusCodeResponse(statusCode=UNKNOWN_ERROR)
         activeUsers[userToLogout].put("~EOF")
         del activeUsers[userToLogout]
+        print(f"{userToLogout} logged out")
         return StatusCodeResponse(statusCode=LOGOUT_OK)
         
     def Delete(self, request, context):
         userToDelete = request.username
-        print(f"received delete request from {userToDelete}") 
+        print(f">> delete requested from {userToDelete}") 
         # this shouldn't ever happen (client-side check that user is logged in)
         if userToDelete not in registeredUsers:
             return StatusCodeResponse(statusCode=UNKNOWN_ERROR)
@@ -119,6 +131,7 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
         activeUsers[userToDelete].put("~EOF")
         del activeUsers[userToDelete]
         del messageBuffer[userToDelete]
+        print(f"{userToDelete} deleted")
         return StatusCodeResponse(statusCode=DELETE_OK)
     
 def serve(port):

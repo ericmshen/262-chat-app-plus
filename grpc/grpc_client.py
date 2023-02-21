@@ -1,12 +1,19 @@
 import grpc
 from messageservice_pb2 import *
 import messageservice_pb2_grpc
+import threading
 
 import sys
 sys.path.append('..')
 from utils import *
 
 username = None
+
+def listenForMessages(messageStream):
+    for message in messageStream:
+        print(f"{message.sender}: {message.body}")
+
+# TODO: gracefully handle server shutdown
 
 def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
     global username
@@ -50,8 +57,9 @@ def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
                 username = usernameInput
                 print(f"<< welcome {username}, you have no new messages")
                 newMessageStream = stub.Subscribe(UsernameRequest(username=username)) 
-                for message in newMessageStream:
-                    print(f"{message.sender}: {message.body}")
+                listener = threading.Thread(target=listenForMessages, args=(newMessageStream,))
+                listener.daemon = True
+                listener.start()
             elif response.statusCode == LOGIN_OK_UNREAD_MSG:
                 username = usernameInput
                 unreadMessages = response.messages
@@ -63,12 +71,13 @@ def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
                 for message in unreadMessages:
                     print(f"{message.sender}: {message.body}")
                 newMessageStream = stub.Subscribe(UsernameRequest(username=username)) 
-                for message in newMessageStream:
-                    print(f"{message.sender}: {message.body}")
+                listener = threading.Thread(target=listenForMessages, args=(newMessageStream,))
+                listener.daemon = True
+                listener.start()
             elif response.statusCode == LOGIN_NOT_REGISTERED:
-                print(f"<< {username} is not registered. please register before logging in")
+                print(f"<< {usernameInput} is not registered. please register before logging in")
             elif response.statusCode == LOGIN_ALREADY_LOGGED_IN:
-                print(f"<< {username} is already logged in")
+                print(f"<< {usernameInput} is already logged in")
             else:
                 print("<< unexpected response from server")
         elif opcode == OP_SEARCH:
@@ -131,7 +140,7 @@ def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
                     print("<< unexpected response from server")
             else:
                 response = stub.Delete(UsernameRequest(username=username))
-                if response.statusCode == LOGOUT_OK:
+                if response.statusCode == DELETE_OK:
                     print("<< succesfully logged out and deleted account")
                     username = None
                 else:
