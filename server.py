@@ -12,6 +12,12 @@ import sys
 # while reading input, processing it, and returning an appropriate response.
 
 # *** VARIABLES *** (to track state of server in an easy, class-free manner)
+# allow any incoming connections on port 22067 by default (port can be specified)
+host, port = "0.0.0.0", 22067
+
+# keep track of all registered users
+registeredUsers = set()
+
 # the message buffer stores unsent messages, and is a dictionary mapping usernames
 # to a list of messages they are to receive upon login
 # each message is encoded as a string with the format "<sender>|<receiver>"
@@ -20,15 +26,9 @@ messageBuffer = defaultdict(list)
 # keep a list of all opened threads, to make sure they don't get GC'd (perhaps unnecessary)
 threads = []
 
-# keep track of all registered users
-registeredUsers = set()
-
 # map of active, logged in usernames to the sockets through which they are connected 
 # to the server; the keys of this dictionary thus serve as a list of online users
 userToSocket = dict()
-
-# allow any incoming connections on port 22067 by default (port can be specified)
-host, port = "0.0.0.0", 22067
 
 # each individual thread runs this function to communicate with its respective client
 def service_connection(clientSocket):
@@ -40,8 +40,9 @@ def service_connection(clientSocket):
     if applicable. """
     
     # loop until socket closed or program interrupted; the overall message from the client
-    # is an operation code followed by operation-specific data, and the overal response is 
-    # a status code followed by status-specific data
+    # is an operation code followed by operation-specific data, and the overall response is 
+    # a status code followed by status-specific data (the message details for a receive operation,
+    # or a header that indicates length followed by a body for search and login operations)
     while True:
         # read 1 byte for the operation code
         try:
@@ -172,7 +173,7 @@ def service_connection(clientSocket):
                 status = SEND_OK_BUFFERED
                 
         # *** LOGOUT ***
-        # server receives a username and returns a status code``
+        # server receives a username and returns a status code
         elif op == OP_LOGOUT:
             print(">> logout requested")
             # read the username
@@ -190,7 +191,8 @@ def service_connection(clientSocket):
                 status = LOGOUT_OK
             
         # *** DELETE ***
-        # server receives a username and returns a status code
+        # server receives a username and returns a status code; buffered messages from
+        # the user are kept in the buffer
         elif op == OP_DELETE:
             print(">> delete requested")
             # read the username
@@ -238,7 +240,7 @@ if __name__ == "__main__":
         
     print('starting server...')
     
-    # start the socket, bind it, and display the host/port (for client connection)
+    # start the socket, bind it, and broadcast the host/port (for client connections)
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     sock.bind((host, port))
     print(f"server started, listening on host {socket.gethostname()} and port {port}")
@@ -251,9 +253,8 @@ if __name__ == "__main__":
     while True:
         # establish connection with client
         try:
+            # a future extension: add timeouts to connections
             c, addr = sock.accept()
-            # TODO: possibly set a timeout here; must handle timeouts on client side
-            # c.settimeout(5.)
         # gracefully-ish handle a keyboard interrupt by closing the active sockets;
         # this will also notify the clients that the server connection has ended
         except KeyboardInterrupt:
