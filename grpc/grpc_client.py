@@ -7,13 +7,16 @@ import sys
 sys.path.append('..')
 from utils import *
 
+# username of the logged in user on the client side: if None, no user is logged in
+# we use this to detect if the client code has someone logged in or not
 username = None
 
+# TODO: read a EOF to return?
 def listenForMessages(messageStream):
     for message in messageStream:
         print(f"{message.sender}: {message.body}")
 
-# TODO: gracefully handle server shutdown
+# TODO: gracefully handle server shutdown, or unavailable server
 
 def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
     global username
