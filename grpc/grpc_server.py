@@ -150,7 +150,7 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
             messageBuffer[recipient].append(formattedMessage)
             return StatusCodeResponse(statusCode=SEND_OK_BUFFERED)
         try:
-            # add the message into the 
+            # add the message into the queue to be read by a Subscribe()
             print(f"queueing message from {sender} to {recipient}")
             activeUsers[recipient].put(formattedMessage)
         except:
@@ -218,5 +218,10 @@ if __name__ == '__main__':
     # upon an interrupt, stop the server
     except KeyboardInterrupt:
         print("\ncaught interrupt, server shutting down")
+        server.stop(0)
+        os._exit(0)
+    # some other mysterious exception could also happen
+    except Exception as e:
+        print(f"\nother error, server shutting down: {str(e)}")
         server.stop(0)
         os._exit(0)
