@@ -14,10 +14,12 @@ username = None
 # a helper function that is read from a stream of messages, formatting and printing them
 # as they arrive; run in a separate thread to avoid blocking
 def listenForMessages(messageStream):
-    for message in messageStream:
-        print(f"{message.sender}: {message.body}")
-
-# TODO: gracefully handle server shutdown, or unavailable server
+    try:
+        for message in messageStream:
+            print(f"{message.sender}: {message.body}")
+    except:
+        print("\n << error: connection for incoming messages closed; this likely means the server has disconnected")
+        return
 
 def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
     """Given a gRPC stub, handles all client interaction with the server. Over the lifetime
@@ -26,8 +28,13 @@ def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
     
     global username
     
-    # TODO: for convenience, can first ping stub to see if server is online
-    # TODO: try catch everything
+    # try to ping the server first with a search request
+    try:
+        stub.Search(SearchRequest(query="test"))
+    except: 
+        print("could not establish connection to server")
+        raise 
+        
     print(">> type a command to begin: {register, login, search, send, logout, delete, quit}")
     
     # loop until socket closed or program interrupted
@@ -235,14 +242,21 @@ def startClient():
         stub = messageservice_pb2_grpc.MessageServiceStub(channel)
         try:
             serve(stub)
-        # upon an interrupt, logout if there's a user currently logged in, then exit
+        # upon a manual interrupt, try a logout if there's a user currently logged in, then exit
         except KeyboardInterrupt:
             print("\n<< caught interrupt, shutting down connection")
             if username:
                 print(f"automatically logging out")
-                stub.Logout(UsernameRequest(username=username))
+                try:
+                    stub.Logout(UsernameRequest(username=username))
+                except:
+                    print("server has already closed connection")
                 username = None
             sys.exit(0)
+        # there is a gRPC communication error
+        except:
+            print("not connected to server, exiting client")
+            sys.exit(1)
 
 if __name__ == '__main__':
     startClient()
