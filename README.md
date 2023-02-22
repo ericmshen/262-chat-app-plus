@@ -1,4 +1,6 @@
 # 262-chat-app
+## Dev Journal
+See [here](https://docs.google.com/document/d/1pVqevcvZ9id7NcvimFF1evuONkPZ04kvvgWlIEtMIzE/edit?usp=sharing).
 ## Vanilla Sockets
 ### Installation
 Ensure you've got the `socket` and `threading` modules already!
