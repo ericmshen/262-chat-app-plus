@@ -1,8 +1,11 @@
 import sys
 import socket
-from utils import *
 import threading
 import os
+
+import sys
+sys.path.append('..')
+from utils import *
 
 # The client is at a high level composed of two threads which handle sending and receiving
 # respectively over a socket. After establishing a connection, listen() monitors the socket

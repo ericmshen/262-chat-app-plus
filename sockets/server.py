@@ -1,8 +1,10 @@
 import socket
 from collections import defaultdict
 import threading
-from utils import *
+
 import sys
+sys.path.append('..')
+from utils import *
 
 # We maintain a relatively simple implementation: no selectors are used, with a new
 # thread being opened for each client connection. All data is also stored in memory
@@ -26,31 +28,16 @@ threads = []
 
 # map of active, logged in usernames to the sockets through which they are connected 
 # to the server; the keys of this dictionary thus serve as a list of online users
-userToSocket = {}
+userToSocket = dict()
 
 # each individual thread runs this function to communicate with its respective client
 def service_connection(clientSocket):
-    """ For each thread servicing a client connection. Over the lifetime of the connection, 
-    it loops and reads from the client socket. It first reads a 1-byte operation code 
+    """ Services a client connection. Over the lifetime of the connection, it loops 
+    and reads from the client socket. It first reads a 1-byte operation code 
     determining the operation desired by the client (as laid out in the spec), 
     followed by operation-specific data, if applicable. It processes the request and 
     returns an operation-specific status code, along with any data to send to the client, 
     if applicable. """
-    
-    # helper function to disconnect a client socket and return from the thread
-    def disconnect():
-        print("not connected to client, closing socket")
-        clientSocket.close()
-        # try to log the corresponding user out if they haven't already; this usually should
-        # not happen, as the client code will try to logout before ending the connection
-        userToLogout = None 
-        for user, sock in userToSocket:
-            if sock is clientSocket:
-                userToLogout = user 
-                break
-        if userToLogout:
-            del userToSocket[userToLogout]
-        return 
     
     # loop until socket closed or program interrupted; the overall message from the client
     # is an operation code followed by operation-specific data, and the overall response is 
@@ -61,29 +48,30 @@ def service_connection(clientSocket):
         try:
             op = clientSocket.recv(1)
         # there's an error communicating with the client: close the socket
-        except: 
-            disconnect()
+        except:
+            print("not connected to client, closing connection")
+            clientSocket.close()
+            return 
+        op = int.from_bytes(op, "big")
         # if the client disconnects, it sends back a None or 0 over the socket;
         # in this case the socket should also be closed
         if not op:
-            print("client disconnected, closing socket")
+            print("client disconnected, closing connection")
             clientSocket.close()
             return
-        op = int.from_bytes(op, "big")
         # values to return over the socket
         status = UNKNOWN_ERROR
         responseHeader = None
         responseBody = None
         print(f"> client issued operation code {op}")
 
+        # TODO: wrap more try-excepts, check for TimeoutError in connection
         # *** REGISTER ***
         # server receives the username and returns a status code
         if op == OP_REGISTER:
             print(">> registration requested")
             # read the username
-            try:
-                username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
-            except: disconnect()
+            username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             # check that the username is new
             if username in registeredUsers:
                 print(f"{username} is already registered")
@@ -101,9 +89,7 @@ def service_connection(clientSocket):
         elif op == OP_LOGIN:
             print(">> login requested")
             # read the username
-            try:
-                username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
-            except: disconnect()
+            username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             if username in registeredUsers:
                 # the user should not be logged in, i.e. not in userToSocket
                 if username in userToSocket:
@@ -137,9 +123,7 @@ def service_connection(clientSocket):
         elif op == OP_SEARCH:
             print(">> search requested")
             # read the query and search for it (query length cannot exceed username length)
-            try:
-                query = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
-            except: disconnect()
+            query = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             matched = searchUsernames(list(registeredUsers), query)
             if matched:
                 # send back data in the form of a 2-byte header describing the number of 
@@ -157,17 +141,14 @@ def service_connection(clientSocket):
         # server receives a sender, receiver, and message, and does two things:
         # the server sends the sender username and message to the intended reciever if 
         # they are logged in using the corresponding socket (message is buffered 
-        # otherwise); the server also returns a status code to the sender, except for 
-        # the case where the sender and receiver are the same
+        # otherwise); the server returns a status code to the sender
         elif op == OP_SEND:
             print(">> send requested")
             # data is formatted as <sender username>|<receiver username>|<message>
-            try:
-                messageRaw = clientSocket.recv(
-                    MESSAGE_LENGTH + 
-                    2 * USERNAME_LENGTH + 
-                    2 * DELIMITER_LENGTH ).decode('ascii').split("|")
-            except: disconnect()
+            messageRaw = clientSocket.recv(
+                MESSAGE_LENGTH + 
+                2 * USERNAME_LENGTH + 
+                2 * DELIMITER_LENGTH ).decode('ascii').split("|")
             sender, recipient, message = messageRaw[0], messageRaw[1], messageRaw[2]
             # check if the recipient exists
             if recipient not in registeredUsers:
@@ -178,22 +159,12 @@ def service_connection(clientSocket):
             # code followed by a string <sender>|<message>; we handle returning a status
             # code to the sender client at the end of this function
             elif recipient in userToSocket:
-                try:
-                    userToSocket[recipient].sendall(
-                        RECEIVE_OK.to_bytes(1, "big") +
-                        bytes(f"{sender}|{message}", 'ascii')
-                    )
-                    print(f"sent message from {sender} to {recipient}")
-                    # if the sender is the same as the recipient, don't send any confirmation;
-                    # the user who messaged themselves need not see more than their own message
-                    if sender == recipient:
-                        continue 
-                    status = SEND_OK_DELIVERED
-                except:
-                    # somehow the recipient connection was not open; try to close it
-                    print(f"error sending to {recipient} socket")
-                    userToSocket[recipient].close()
-                    status = SEND_FAILED
+                userToSocket[recipient].sendall(
+                    RECEIVE_OK.to_bytes(1, "big") +
+                    bytes(f"{sender}|{message}", 'ascii')
+                )
+                print(f"sent message from {sender} to {recipient}")
+                status = SEND_OK_DELIVERED
             # otherwise, store the message in the buffer's reciever slot as
             # <sender>|<message>, and communicate the message's storage
             else:
@@ -258,7 +229,6 @@ def service_connection(clientSocket):
             toSend += bytes(responseBody, 'ascii')
         clientSocket.sendall(toSend)
         print("server response given")
-        return status, responseHeader, responseBody
 
 if __name__ == "__main__":
     # a port can be specified when running the program

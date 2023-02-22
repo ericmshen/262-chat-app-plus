@@ -109,19 +109,3 @@ def isValidMessage(message : str):
         )
     except UnicodeEncodeError:
         return False
-<<<<<<< HEAD
-=======
-
-def utilsTests():
-    print(formatMessage("sender1", "recipient1", "message1"))
-    print(formatMessage("sender1", "recipient1", "message2"))
-    print(formatMessage("sender1", "recipient1", "message3"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "*"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "s*"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "c*"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "*1"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "sender"))
-
-if __name__ == "__main__":
-    utilsTests()
->>>>>>> 5ee643f958ce4bf0be17ded531e9b83fa0857e43
