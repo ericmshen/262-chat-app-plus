@@ -30,9 +30,11 @@ Using pip:
 - `pip install grpcio`
 - `pip install protobuf`
 
-Using conda (recommended for Max M1 users):
+Using conda (recommended for Mac M1 users):
 - `conda install grpcio`
 - `conda install -c anaconda protobuf`
+
+If you want to modify the code, optionally install `grpcio-tools`.
 
 ### Running
 The server code must be running on a device before the client code can be run (on the same wifi network). 
