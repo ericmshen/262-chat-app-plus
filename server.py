@@ -229,6 +229,7 @@ def service_connection(clientSocket):
             toSend += bytes(responseBody, 'ascii')
         clientSocket.sendall(toSend)
         print("server response given")
+        return status, responseHeader, responseBody
 
 if __name__ == "__main__":
     # a port can be specified when running the program

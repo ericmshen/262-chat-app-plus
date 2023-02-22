@@ -64,7 +64,7 @@ def parseMessages(input : str) -> str:
     for msg in messages:
         # <receiver>|<message> => <receiver>: <message>
         messageLst = msg.split("|")
-        retMsg += f"{messageLst[0]}: {messageLst[1]} \n"
+        retMsg += f"{messageLst[0]}: {messageLst[1]}\n"
     return retMsg
 
 # ibid for search results: expands separators (|s) into newlines
@@ -78,19 +78,20 @@ def searchUsernames(usernames : List[str], query : str):
     if len(usernames) == 0: return []
     if len(query) == 0:
         return usernames
-    q = query.replace("*", ".*")
+    q = "^" + query + "$"
+    q = q.replace("*", ".*")
     return list(filter(lambda x: re.match(q, x), usernames))
 
 # check if a username is valid: it must not be blank, be alphanumeric, and be
 # no more than 50 characters
 def isValidUsername(username : str):
-    return username and username.isalnum() and len(username) <= 50 
+    return username and username.isalnum() and len(username) <= USERNAME_LENGTH 
 
 # similar to isValidUsername, but for queries (can also handle *)
 def isValidQuery(query : str):
     return ( 
         query and 
-        set(query).issubset(set(string.ascii_lowercase + string.digits + '*')) and 
+        set(query).issubset(set(string.ascii_lowercase + string.ascii_uppercase + string.digits + '*')) and 
         len(query) <= USERNAME_LENGTH 
     )
 
@@ -107,17 +108,3 @@ def isValidMessage(message : str):
         )
     except UnicodeEncodeError:
         return False
-
-# TODO: move tests elsewhere
-def utilsTests():
-    print(formatMessage("sender1", "recipient1", "message1"))
-    print(formatMessage("sender1", "recipient1", "message2"))
-    print(formatMessage("sender1", "recipient1", "message3"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "*"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "s*"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "c*"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "*1"))
-    print(searchUsernames(["sender1", "sender2", "sender3"], "sender"))
-
-if __name__ == "__main__":
-    utilsTests()
