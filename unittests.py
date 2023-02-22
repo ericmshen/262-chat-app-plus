@@ -3,7 +3,7 @@ from utils import *
 import grpc
 import threading
 import socket 
-import threading
+import time
 
 import sys 
 sys.path.append('./sockets')
@@ -95,12 +95,19 @@ class TestUtils(unittest.TestCase):
         self.assertFalse(isValidUsername(usernameTooLong))
         
     def testSocketServer(self):
+        start = time.time()
+        
         testServer = threading.Thread(target=startTestSocketServer)
         testServer.daemon = True
         testServer.start()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         connected = sock.connect_ex(TEST_SOCKET_SERVER_ADDR)
         self.assertTrue(connected == 0)
+        
+        end = time.time()
+        print(f"socket init time: {end - start}")
+        
+        start = time.time()
         
         opcode, messageBody = OP_LOGIN, "foo"
         sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
@@ -210,16 +217,39 @@ class TestUtils(unittest.TestCase):
         code = int.from_bytes(code, "big")
         self.assertTrue(code == SEND_RECIPIENT_DNE)
         
+        end = time.time()
+        print(f"socket op time: {end - start}")
+        
+        start = time.time()
+        
+        for i in range(100):
+            opcode, messageBody = OP_REGISTER, str(i)
+            sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+            code = sock.recv(CODE_LENGTH)
+            code = int.from_bytes(code, "big")
+            if code != REGISTER_OK:
+                self.assertFalse()
+        
+        end = time.time()
+        print(f"socket 100 registers time: {end - start}")
+        
         # the socket isn't cleaned up, but we ignore this for testing purposes
         sock.close()
 
     def testgRPCServer(self):
+        start = time.time()
+        
         testServer = threading.Thread(target=startTestgRPCServer)
         testServer.daemon = True
         testServer.start()
         with grpc.insecure_channel("localhost:" + str(TEST_GRPC_SERVER_PORT)) as channel:
             stub = messageservice_pb2_grpc.MessageServiceStub(channel)
             self.assertTrue(stub != None)
+            
+            end = time.time()
+            print(f"gRPC server init time: {end - start}")
+            
+            start = time.time()
             
             response = stub.Login(UsernameRequest(username="foo"))
             self.assertTrue(response.statusCode == LOGIN_NOT_REGISTERED)
@@ -270,6 +300,19 @@ class TestUtils(unittest.TestCase):
             
             response = stub.Send(MessageRequest(sender="foo", recipient="bar", body="test3"))
             self.assertTrue(response.statusCode == SEND_RECIPIENT_DNE)
+            
+            end = time.time()
+            print(f"gRPC server op time: {end - start}")
+            
+            start = time.time()
+        
+            for i in range(100):
+                response = stub.Register(UsernameRequest(username=str(i)))
+                if response.statusCode != REGISTER_OK:
+                    self.assertFalse()
+            
+            end = time.time()
+            print(f"socket 100 registers time: {end - start}")
 
 if __name__ == '__main__':
     unittest.main()

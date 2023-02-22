@@ -267,13 +267,30 @@ def run():
         serve()
         
     # users may quit via a KeyboardInterrupt, or by typing a command for OP_DISCONNECT
-    except:
+    except KeyboardInterrupt:
         print("\n<< caught interrupt, shutting down connection")
         # if the user is still logged in, send a logout message before closing the connection
         if username:
             print(f"automatically logging out")
             opcode = OP_LOGOUT
-            sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(username, 'ascii'))
+            try:
+                sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(username, 'ascii'))
+            except:
+                print("server is not connected")
+            username = None
+        sock.shutdown(socket.SHUT_RDWR)
+        sock.close()
+        sys.exit(0)
+    except Exception as e:
+        print("encountered error, exiting client:", e)
+        # if the user is still logged in, send a logout message before closing the connection
+        if username:
+            print(f"automatically logging out")
+            opcode = OP_LOGOUT
+            try:
+                sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(username, 'ascii'))
+            except:
+                print("server is not connected")
             username = None
         sock.shutdown(socket.SHUT_RDWR)
         sock.close()
