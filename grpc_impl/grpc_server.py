@@ -26,7 +26,7 @@ from utils import *
 
 # *** VARIABLES *** (to track state of server in an easy, class-free manner)
 # allow any incoming connections on port 22068 by default (port can be specified)
-host, port = "0.0.0.0", "22068"
+port = "22068"
 
 # string to indicate that a Queue can be closed (no more messages will come through it)
 QUEUE_EOF = "~EOF"

@@ -142,7 +142,7 @@ def listen():
         
         # *** DELETE ***
         elif code == DELETE_OK:
-            print("<< succesfully logged out and deleted account")
+            print("<< successfully logged out and deleted account")
             username = None
         
         # something went wrong in the server

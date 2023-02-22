@@ -1,13 +1,32 @@
 import unittest
 from utils import *
 import grpc
-from messageservice_pb2 import *
-import messageservice_pb2_grpc
 import threading
+import socket 
+import threading
+import os
 
+import sys 
+sys.path.append('./sockets')
+sys.path.append('./grpc_impl')
+from sockets.server import service_connection
+from grpc_impl.grpc_server import MessageServer, serve
+from grpc_impl.grpc_client import *
+
+TEST_SOCKET_SERVER_ADDR = ("localhost", 55566)
+TEST_GRPC_SERVER_PORT = "56565"
+
+def startTestSocketServer():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.bind(TEST_SOCKET_SERVER_ADDR)
+    sock.listen(2)
+    c, _ = sock.accept()
+    service_connection(c)
+
+def startTestgRPCServer():
+    serve(TEST_GRPC_SERVER_PORT)
 
 # testing utils
-
 class TestUtils(unittest.TestCase):
     def testFormatMessage(self):
         t1 = formatMessage("sender1", "recipient1", "message1")
@@ -72,6 +91,36 @@ class TestUtils(unittest.TestCase):
 
         usernameTooLong = "abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwxyz"
         self.assertFalse(isValidUsername(usernameTooLong))
+        
+    def testSocketServer(self):
+        testServer = threading.Thread(target=startTestSocketServer)
+        testServer.start()
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        connected = sock.connect_ex(TEST_SOCKET_SERVER_ADDR)
+        self.assertTrue(connected == 0)
+
+    def testgRPCServer(self):
+        testServer = threading.Thread(target=startTestgRPCServer)
+        testServer.start()
+        with grpc.insecure_channel("localhost:" + str(TEST_GRPC_SERVER_PORT)) as channel:
+            stub = messageservice_pb2_grpc.MessageServiceStub(channel)
+            print("Sending invalid login...")
+            response = stub.Login(UsernameRequest(username="foo"))
+            print(f"Client received status code: {response.statusCode}")
+            print("Sending register...")
+            response = stub.Register(UsernameRequest(username="foo"))
+            print(f"Client received status code: {response.statusCode}")
+            print("Sending re-register...")
+            response = stub.Register(UsernameRequest(username="foo"))
+            print(f"Client received status code: {response.statusCode}")
+            print("Sending login...")
+            response = stub.Login(UsernameRequest(username="foo"))
+            print(f"Client received status code: {response.statusCode}")
+            print("Sending invalid login...")
+            response = stub.Login(UsernameRequest(username="bar"))
+            print(f"Client received status code: {response.statusCode}")
+        return
 
 if __name__ == '__main__':
     unittest.main()
+    os._exit(0)

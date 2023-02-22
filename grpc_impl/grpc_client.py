@@ -21,7 +21,7 @@ def listenForMessages(messageStream):
         print("\n << error: connection for incoming messages closed; this likely means the server has disconnected")
         return
 
-def serve(stub:messageservice_pb2_grpc.MessageServiceStub):
+def serveClient(stub:messageservice_pb2_grpc.MessageServiceStub):
     """Given a gRPC stub, handles all client interaction with the server. Over the lifetime
     of the connection, repeatedly prompts for user input, processes entered data, communicates
     with the server, and prints results."""
@@ -241,7 +241,7 @@ def startClient():
         # create the stub
         stub = messageservice_pb2_grpc.MessageServiceStub(channel)
         try:
-            serve(stub)
+            serveClient(stub)
         # upon a manual interrupt, try a logout if there's a user currently logged in, then exit
         except KeyboardInterrupt:
             print("\n<< caught interrupt, shutting down connection")
