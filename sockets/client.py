@@ -145,6 +145,10 @@ def listen():
             print("<< successfully logged out and deleted account")
             username = None
         
+        # this should never happen
+        elif code == BAD_OPERATION:
+            print("<< invalid command given to server")
+        
         # something went wrong in the server
         elif code == UNKNOWN_ERROR:
             print("<< unknown error")

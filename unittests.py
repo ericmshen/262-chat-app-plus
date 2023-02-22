@@ -4,13 +4,12 @@ import grpc
 import threading
 import socket 
 import threading
-import os
 
 import sys 
 sys.path.append('./sockets')
 sys.path.append('./grpc_impl')
 from sockets.server import service_connection
-from grpc_impl.grpc_server import MessageServer, serve
+from grpc_impl.grpc_server import serve
 from grpc_impl.grpc_client import *
 
 TEST_SOCKET_SERVER_ADDR = ("localhost", 55566)
@@ -46,8 +45,11 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(searchExact, [])
     
     def testParseMessages(self):
-        parsed = parseMessages("eric|hello!!!\ncharu|bye")
-        self.assertEqual(parsed, "eric: hello!!!\ncharu: bye\n")
+        parsed = parseMessages("a|hello!!!")
+        self.assertEqual(parsed, "a: hello!!!\n")
+        
+        parsed = parseMessages("a|hello!!!\nb|bye")
+        self.assertEqual(parsed, "a: hello!!!\nb: bye\n")
     
     def testParseSearchResults(self):
         parsed = parseSearchResults("sender1|sender2")
@@ -94,33 +96,181 @@ class TestUtils(unittest.TestCase):
         
     def testSocketServer(self):
         testServer = threading.Thread(target=startTestSocketServer)
+        testServer.daemon = True
         testServer.start()
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         connected = sock.connect_ex(TEST_SOCKET_SERVER_ADDR)
         self.assertTrue(connected == 0)
+        
+        opcode, messageBody = OP_LOGIN, "foo"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == LOGIN_NOT_REGISTERED)
+        
+        opcode, messageBody = OP_REGISTER, "foo"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == REGISTER_OK)
+        
+        opcode, messageBody = OP_REGISTER, "foo"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == REGISTER_USERNAME_EXISTS)
+        
+        opcode, messageBody = OP_LOGIN, "foo"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == LOGIN_OK_NO_UNREAD_MSG)
+        
+        opcode, messageBody = OP_SEARCH, "*"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == SEARCH_OK)
+        numResults = sock.recv(MSG_HEADER_LENGTH)
+        numResults = int.from_bytes(numResults, "big")
+        self.assertTrue(numResults == 1)
+        results = sock.recv(USERNAME_LENGTH + DELIMITER_LENGTH).decode('ascii')
+        self.assertTrue(results == "foo")
+        
+        opcode, messageBody = OP_SEARCH, "noresults"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == SEARCH_NO_RESULTS)
+        
+        opcode, messageBody = OP_SEND, "foo|foo|test"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == RECEIVE_OK)
+        message = sock.recv(MESSAGE_LENGTH + USERNAME_LENGTH + DELIMITER_LENGTH).decode('ascii')
+        self.assertTrue(message == "foo|test")
+        
+        opcode, messageBody = OP_SEND, "foo|bar|test"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == SEND_RECIPIENT_DNE)
+        
+        opcode, messageBody = OP_LOGOUT, "foo"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == LOGOUT_OK)
+        
+        opcode = 72
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big"))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == BAD_OPERATION)
+        
+        opcode, messageBody = OP_REGISTER, "bar"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == REGISTER_OK)
+        
+        opcode, messageBody = OP_LOGIN, "bar"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == LOGIN_OK_NO_UNREAD_MSG)
+        
+        opcode, messageBody = OP_SEND, "bar|foo|test2"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == SEND_OK_BUFFERED)
+        
+        opcode, messageBody = OP_DELETE, "bar"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == DELETE_OK)
+        
+        opcode, messageBody = OP_LOGIN, "foo"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == LOGIN_OK_UNREAD_MSG)
+        numMessages = sock.recv(MSG_HEADER_LENGTH)
+        numMessages = int.from_bytes(numMessages, "big")
+        self.assertTrue(numMessages == 1)
+        messages = sock.recv(MESSAGE_LENGTH + USERNAME_LENGTH + 2 * DELIMITER_LENGTH).decode("ascii")
+        self.assertTrue(messages == "bar|test2")
+        
+        opcode, messageBody = OP_SEND, "foo|bar|test3"
+        sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+        code = sock.recv(CODE_LENGTH)
+        code = int.from_bytes(code, "big")
+        self.assertTrue(code == SEND_RECIPIENT_DNE)
+        
+        # the socket isn't cleaned up, but we ignore this for testing purposes
+        sock.close()
 
     def testgRPCServer(self):
         testServer = threading.Thread(target=startTestgRPCServer)
+        testServer.daemon = True
         testServer.start()
         with grpc.insecure_channel("localhost:" + str(TEST_GRPC_SERVER_PORT)) as channel:
             stub = messageservice_pb2_grpc.MessageServiceStub(channel)
-            print("Sending invalid login...")
+            self.assertTrue(stub != None)
+            
             response = stub.Login(UsernameRequest(username="foo"))
-            print(f"Client received status code: {response.statusCode}")
-            print("Sending register...")
+            self.assertTrue(response.statusCode == LOGIN_NOT_REGISTERED)
+            
             response = stub.Register(UsernameRequest(username="foo"))
-            print(f"Client received status code: {response.statusCode}")
-            print("Sending re-register...")
+            self.assertTrue(response.statusCode == REGISTER_OK)
+            
             response = stub.Register(UsernameRequest(username="foo"))
-            print(f"Client received status code: {response.statusCode}")
-            print("Sending login...")
+            self.assertTrue(response.statusCode == REGISTER_USERNAME_EXISTS)
+            
             response = stub.Login(UsernameRequest(username="foo"))
-            print(f"Client received status code: {response.statusCode}")
-            print("Sending invalid login...")
+            self.assertTrue(response.statusCode == LOGIN_OK_NO_UNREAD_MSG)
+            
+            response = stub.Search(SearchRequest(query="*"))
+            self.assertTrue(response.statusCode == SEARCH_OK)
+            self.assertTrue(len(response.results) == 1)
+            self.assertTrue(response.results[0] == "foo")
+            
+            response = stub.Search(SearchRequest(query="noresults"))
+            self.assertTrue(response.statusCode == SEARCH_NO_RESULTS)
+            
+            response = stub.Send(MessageRequest(sender="foo", recipient="foo", body="test"))
+            self.assertTrue(response.statusCode == SEND_OK_DELIVERED)
+            
+            response = stub.Send(MessageRequest(sender="foo", recipient="bar", body="no"))
+            self.assertTrue(response.statusCode == SEND_RECIPIENT_DNE)
+            
+            response = stub.Logout(UsernameRequest(username="foo"))
+            self.assertTrue(response.statusCode == LOGOUT_OK)
+            
+            response = stub.Register(UsernameRequest(username="bar"))
+            self.assertTrue(response.statusCode == REGISTER_OK)
+            
             response = stub.Login(UsernameRequest(username="bar"))
-            print(f"Client received status code: {response.statusCode}")
-        return
+            self.assertTrue(response.statusCode == LOGIN_OK_NO_UNREAD_MSG)
+            
+            response = stub.Send(MessageRequest(sender="bar", recipient="foo", body="test2"))
+            self.assertTrue(response.statusCode == SEND_OK_BUFFERED)
+            
+            response = stub.Delete(UsernameRequest(username="bar"))
+            self.assertTrue(response.statusCode == DELETE_OK)
+            
+            response = stub.Login(UsernameRequest(username="foo"))
+            self.assertTrue(response.statusCode == LOGIN_OK_UNREAD_MSG)
+            self.assertTrue(len(response.messages) == 1)
+            self.assertTrue(response.messages[0].sender == "bar")
+            self.assertTrue(response.messages[0].body == "test2")
+            
+            response = stub.Send(MessageRequest(sender="foo", recipient="bar", body="test3"))
+            self.assertTrue(response.statusCode == SEND_RECIPIENT_DNE)
 
 if __name__ == '__main__':
     unittest.main()
-    os._exit(0)
+    sys.exit(0)
