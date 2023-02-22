@@ -24,6 +24,7 @@ SEARCH_NO_RESULTS = 17
 SEND_OK_DELIVERED = 24
 SEND_OK_BUFFERED = 25
 SEND_RECIPIENT_DNE = 26
+SEND_FAILED = 27
 RECEIVE_OK = 32
 LOGOUT_OK = 40
 DELETE_OK = 48
@@ -108,7 +109,6 @@ def isValidMessage(message : str):
     except UnicodeEncodeError:
         return False
 
-# TODO: move tests elsewhere
 def utilsTests():
     print(formatMessage("sender1", "recipient1", "message1"))
     print(formatMessage("sender1", "recipient1", "message2"))

@@ -93,7 +93,6 @@ class MessageServer(messageservice_pb2_grpc.MessageServiceServicer):
         messageBuffer[username] = []
         return LoginResponse(statusCode=LOGIN_OK_UNREAD_MSG, messages=unreadMessages)
         
-    # TODO: before shutdown, find some way to pass a EOF to client
     def Subscribe(self, request, context):
         """Subscribe a user to receive messages that are delivered instantly. 
         Automatically called upon a successful login. Given a UsernameRequest, the

@@ -4,8 +4,6 @@ from utils import *
 import threading
 import os
 
-# TODO: try catch
-
 # The client is at a high level composed of two threads which handle sending and receiving
 # respectively over a socket. After establishing a connection, listen() monitors the socket
 # for incoming data from the server and handles it according to the wire protocol. serve()
@@ -31,6 +29,14 @@ def listen():
     
     global username
     
+    # helper function to exit the client
+    def stop():
+        print("not connected to server, exiting client")
+        # close the connection
+        sock.close()
+        # use os._exit to quickly kill everything from the thread running listen()
+        os._exit(0)
+    
     # loop until socket closed or program interrupted; the overall message from the server
     # is a status code followed by status-specific data
     while True:
@@ -39,17 +45,15 @@ def listen():
             code = sock.recv(CODE_LENGTH)
             code = int.from_bytes(code, "big")
         # if try fails, there's an error communicating with the server; exit
-        except:
-            print("not connected to server, exiting client")
-            sock.close()
-            # use os._exit to quickly kill everything from the thread running listen()
-            os._exit(0)
+        except: stop()
         # if the server disconnects, it sends back a None or 0; also exit
         if not code:
             print("server disconnected, exiting client")
             sock.close()
             os._exit(0)
-        # all status codes map to a unique server response to a particular operation
+
+        # all status codes map a unique server response to a particular operation
+        # all receives are try-excepted; in the case of ANY error, we exit
         
         # *** REGISTER ***
         # don't "login" (set the username) yet; the user should explicitly login
@@ -66,16 +70,19 @@ def listen():
         # with unread messages, receive the number of messages and then the messages themselves
         elif code == LOGIN_OK_UNREAD_MSG:
             # we first read the number of messages from the header
-            numMessages = sock.recv(MSG_HEADER_LENGTH)
-            numMessages = int.from_bytes(numMessages, "big")
+            try:
+                numMessages = sock.recv(MSG_HEADER_LENGTH)
+                numMessages = int.from_bytes(numMessages, "big")
+                # receive the buffered messages; each message has the form <sender>|<message>\n, so 
+                # assuming newlines are encoded in DELIMITER_LENGTH bytes, the overall size of the 
+                # response is at most MESSAGE_LENGTH + USERNAME_LENGTH + 2 * DELIMITER_LENGTH
+                messages = sock.recv(numMessages * (MESSAGE_LENGTH + USERNAME_LENGTH + 2 * DELIMITER_LENGTH)).decode('ascii')
+            except: stop()
+            # print the buffered messages
             if numMessages == 1:
                 print(f"<< welcome {username}, you have one new message:")
             else:
                 print(f"<< welcome {username}, you have {numMessages} new messages:")
-            # receive and print the actual messages; each message has the form <sender>|<message>\n, so 
-            # assuming newlines are encoded in DELIMITER_LENGTH bytes, the overall size of the response 
-            # is at most MESSAGE_LENGTH + USERNAME_LENGTH + 2 * DELIMITER_LENGTH
-            messages = sock.recv(numMessages * (MESSAGE_LENGTH + USERNAME_LENGTH + 2 * DELIMITER_LENGTH)).decode('ascii')
             print(parseMessages(messages), end="")
         # if there's an error, clear the global username variable; login did not succeed
         elif code == LOGIN_NOT_REGISTERED:
@@ -88,15 +95,18 @@ def listen():
         # *** SEARCH ***
         elif code == SEARCH_OK:
             # read the number of results from the header
-            numResults = sock.recv(MSG_HEADER_LENGTH)
-            numResults = int.from_bytes(numResults, "big")
+            try:
+                numResults = sock.recv(MSG_HEADER_LENGTH)
+                numResults = int.from_bytes(numResults, "big")
+                # receive the number of results themselves; each result has the form <username>|, so
+                # the overall size of the response is at most USERNAME_LENGTH + DELIMITER_LENGTH
+                results = sock.recv(numResults * (USERNAME_LENGTH + DELIMITER_LENGTH)).decode('ascii')
+            except: stop()
+            # print the results
             if numResults == 1:
                 print("<< 1 username matched your query:")
             else:
                 print(f"{numResults} usernames matched your query:")
-            # receive the number of resulst themselves; each result has the form <username>|, so
-            # the overall size of the response is at most USERNAME_LENGTH + DELIMITER_LENGTH
-            results = sock.recv(numResults * (USERNAME_LENGTH + DELIMITER_LENGTH)).decode('ascii')
             print(parseSearchResults(results))
         elif code == SEARCH_NO_RESULTS:
             print("<< no usernames matched your query")
@@ -108,12 +118,18 @@ def listen():
             print(f"<< your message to {recipient} will be delivered when they log in")
         elif code == SEND_RECIPIENT_DNE:
             print(f"<< the user {recipient} does not exist, or has deleted their account")
+        elif code == SEND_FAILED:
+            print(f"<< your message to {recipient} could not be delivered, please try again later")
             
         # *** RECEIVE ***
         # this status code corresponds to a client RECEIVING an incoming messsage, which will be
         # formatted as <sender>|<message>
         elif code == RECEIVE_OK:
-            message = sock.recv(MESSAGE_LENGTH + USERNAME_LENGTH + DELIMITER_LENGTH).decode('ascii')
+            try:
+                message = sock.recv(MESSAGE_LENGTH + USERNAME_LENGTH + DELIMITER_LENGTH).decode('ascii')
+            except: stop()
+            if username == recipient:
+                print("<< congratulations, you sent a message to yourself")
             print(parseMessages(message), end="")
         
         # *** LOGOUT ***
@@ -195,7 +211,7 @@ def serve():
                 continue
             message = input(">> message: ").strip()
             if not isValidMessage(message):
-                print("<< messages must contain only ASCII (English) characters, not contain newlines or '|', must not be blank, and must be under 262 characters, please try again")
+                print(f"<< messages must contain only ASCII (English) characters, not contain newlines or '|', must not be blank, and must be under 262 characters (current length {len(message)} characters), please try again")
                 continue
             # store the recipient globally so we can reference it in listen()
             recipient = recipientInput
@@ -208,7 +224,7 @@ def serve():
             if not username:
                 print("<< you are not logged in to an account")
                 continue
-            # like register and search, take in the username as a confirm step, client-side
+            # like register and search, take in the username as a confirmation step, client-side
             # check for validity
             usernameInput = input(f">> enter username to confirm {command}: ").strip()
             if not isValidUsername(usernameInput):
@@ -244,7 +260,7 @@ def run():
         serve()
         
     # users may quit via a KeyboardInterrupt, or by typing a command for OP_DISCONNECT
-    except KeyboardInterrupt:
+    except:
         print("\n<< caught interrupt, shutting down connection")
         # if the user is still logged in, send a logout message before closing the connection
         if username:
@@ -271,6 +287,6 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connected = sock.connect_ex(serverAddr)
     if connected != 0:
-        print("<< failed to create socket connection to server")
+        print("<< failed to create socket connection to server, exiting client")
         sys.exit(1)
     run()
