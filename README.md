@@ -1,19 +1,23 @@
 # 262-chat-app
+Now distributed-ish!
 ## Dev Journal: Contains Observations and Discussion!
-See [here](https://docs.google.com/document/d/1pVqevcvZ9id7NcvimFF1evuONkPZ04kvvgWlIEtMIzE/edit?usp=sharing).
-## Vanilla Sockets
-### Installation
+See [here](https://docs.google.com/document/d/1qOgs7rheuafcUsHj_HPbGeY2kVQCZfjHmDMKqBX9uXE/edit?usp=sharing).
+## Installation
 Ensure you've got the `socket` and `threading` modules already!
 
-### Running
+## Running
+TODO
+
 The server code must be running on a device before the client code can be run (on the same wifi network). 
 
 To run the server code:
+- TODO
 - change into the `sockets` directory by typing `cd sockets`
 - type `python3 server.py` and click "enter"
 - you can specify an optional port to run on as an argument
 
 To run the client code:
+- TODO
 - change into the `sockets` directory by typing `cd sockets`
 - copy the strings next to "host" printed in the terminal of the computer running the server code (ex: `dhcp-10-250-12-215.harvard.edu`) and the "port" (ex: `22067`)
 - type `python3 client.py {host} {port}` where `{host}` and `{port}` are the values copied in the previous step
@@ -30,7 +34,9 @@ To use the client code:
 
 To quit the client, either type `quit` into the terminal or press the `Ctrl+C` keys. To quit the server, press the `Ctrl+C` keys. Note that there may be multiple clients running at any given time but only one server.
 
-### Overview of Protocol
+## Overview of Protocol
+TODO
+
 See our journal for details. We stipulate that usernames have max size 50 and messages have max size 262; as we use ASCII encoding, string length is equal to number of bytes used. Messages passed between the server and client will always first contain a 1-byte code determining the operation (for client requests) or status (for server responses). Codes correspond to distinct scenarios and are handled appropriately (see utils.py). Additional information is passed depending on the code, and in most cases consists as strings with ASCII encoding. We use the "|" character (also 1 byte) as a delimiter for message parsing. In particular, the additional information is:
 - For login, register, logout, and delete requests, the client passes the username string. For search requests, the client passes the query string.
 - For send requests, the client passes a string encoding with the form "sender|recipient|message".
@@ -41,35 +47,3 @@ See our journal for details. We stipulate that usernames have max size 50 and me
 Try-excepts are used throughout to handle KeyboardInterrupts and other exceptions. The client and server code will attempt to log out on the event of a program exit. If a client loses connection with the server (e.g. the server shuts down), they will automatically exit.
 
 Our code is thoroughly documented and much of the protocol details are explained within.
-
-## gRPC
-### Installation
-Using pip:
-- `pip install grpcio`
-- `pip install protobuf`
-
-Using conda (recommended for Mac M1 users):
-- `conda install grpcio`
-- `conda install -c anaconda protobuf`
-
-If you want to modify the code, optionally install `grpcio-tools`.
-
-### Running
-The server code must be running on a device before the client code can be run (on the same wifi network). 
-
-To run the server code:
-- change into the `grpc_impl` directory by typing `cd grpc_impl`
-- type `python3 grpc_server.py` and click "enter"
-- you can specify an optional port to run on as an argument
-
-To run the client code:
-- change into the `grpc_impl` directory by typing `cd grpc_impl`
-- copy the strings next to "host" printed in the terminal of the computer running the server code (ex: `dhcp-10-250-12-215.harvard.edu`) and the "port" (ex: `22068`)
-- type `python3 grpc_client.py {host} {port}` where `{host}` and `{port}` are the values copied in the previous step
-
-You can run the client code analogously.
-
-To quit the client, either type `quit` into the terminal or press the `Ctrl+C` keys. To quit the server, press the `Ctrl+C` keys. Note that there may be multiple clients running at any given time but only one server.
-
-### Overview of Protocol
-Please see our annotated protobuf in `protos/messageservice.proto` for details! When a client logs in, in order to receive new messages instantly they will call the server's Subscribe method and run a separate thread to listen to a stream of new messages. The remaining functionality, including error-handling, is analogous to the socket implementation. Also analogously, our code is thoroughly documented and much of the protocol details are explained within.

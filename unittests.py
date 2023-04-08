@@ -1,19 +1,13 @@
 import unittest
 from utils import *
-import grpc
 import threading
 import socket 
 import time
 
 import sys 
-sys.path.append('./sockets')
-sys.path.append('./grpc_impl')
-from sockets.server import service_connection
-from grpc_impl.grpc_server import serve
-from grpc_impl.grpc_client import *
+from server import service_connection
 
 TEST_SOCKET_SERVER_ADDR = ("localhost", 55566)
-TEST_GRPC_SERVER_PORT = "56565"
 
 def startTestSocketServer():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -21,9 +15,6 @@ def startTestSocketServer():
     sock.listen(2)
     c, _ = sock.accept()
     service_connection(c)
-
-def startTestgRPCServer():
-    serve(TEST_GRPC_SERVER_PORT)
 
 # testing utils
 class TestUtils(unittest.TestCase):
@@ -235,84 +226,6 @@ class TestUtils(unittest.TestCase):
         
         # the socket isn't cleaned up, but we ignore this for testing purposes
         sock.close()
-
-    def testgRPCServer(self):
-        start = time.time()
-        
-        testServer = threading.Thread(target=startTestgRPCServer)
-        testServer.daemon = True
-        testServer.start()
-        with grpc.insecure_channel("localhost:" + str(TEST_GRPC_SERVER_PORT)) as channel:
-            stub = messageservice_pb2_grpc.MessageServiceStub(channel)
-            self.assertTrue(stub != None)
-            
-            end = time.time()
-            print(f"gRPC server init time: {end - start}")
-            
-            start = time.time()
-            
-            response = stub.Login(UsernameRequest(username="foo"))
-            self.assertTrue(response.statusCode == LOGIN_NOT_REGISTERED)
-            
-            response = stub.Register(UsernameRequest(username="foo"))
-            self.assertTrue(response.statusCode == REGISTER_OK)
-            
-            response = stub.Register(UsernameRequest(username="foo"))
-            self.assertTrue(response.statusCode == REGISTER_USERNAME_EXISTS)
-            
-            response = stub.Login(UsernameRequest(username="foo"))
-            self.assertTrue(response.statusCode == LOGIN_OK_NO_UNREAD_MSG)
-            
-            response = stub.Search(SearchRequest(query="*"))
-            self.assertTrue(response.statusCode == SEARCH_OK)
-            self.assertTrue(len(response.results) == 1)
-            self.assertTrue(response.results[0] == "foo")
-            
-            response = stub.Search(SearchRequest(query="noresults"))
-            self.assertTrue(response.statusCode == SEARCH_NO_RESULTS)
-            
-            response = stub.Send(MessageRequest(sender="foo", recipient="foo", body="test"))
-            self.assertTrue(response.statusCode == SEND_OK_DELIVERED)
-            
-            response = stub.Send(MessageRequest(sender="foo", recipient="bar", body="no"))
-            self.assertTrue(response.statusCode == SEND_RECIPIENT_DNE)
-            
-            response = stub.Logout(UsernameRequest(username="foo"))
-            self.assertTrue(response.statusCode == LOGOUT_OK)
-            
-            response = stub.Register(UsernameRequest(username="bar"))
-            self.assertTrue(response.statusCode == REGISTER_OK)
-            
-            response = stub.Login(UsernameRequest(username="bar"))
-            self.assertTrue(response.statusCode == LOGIN_OK_NO_UNREAD_MSG)
-            
-            response = stub.Send(MessageRequest(sender="bar", recipient="foo", body="test2"))
-            self.assertTrue(response.statusCode == SEND_OK_BUFFERED)
-            
-            response = stub.Delete(UsernameRequest(username="bar"))
-            self.assertTrue(response.statusCode == DELETE_OK)
-            
-            response = stub.Login(UsernameRequest(username="foo"))
-            self.assertTrue(response.statusCode == LOGIN_OK_UNREAD_MSG)
-            self.assertTrue(len(response.messages) == 1)
-            self.assertTrue(response.messages[0].sender == "bar")
-            self.assertTrue(response.messages[0].body == "test2")
-            
-            response = stub.Send(MessageRequest(sender="foo", recipient="bar", body="test3"))
-            self.assertTrue(response.statusCode == SEND_RECIPIENT_DNE)
-            
-            end = time.time()
-            print(f"gRPC server op time: {end - start}")
-            
-            start = time.time()
-        
-            for i in range(100):
-                response = stub.Register(UsernameRequest(username=str(i)))
-                if response.statusCode != REGISTER_OK:
-                    self.assertFalse()
-            
-            end = time.time()
-            print(f"socket 100 registers time: {end - start}")
 
 if __name__ == '__main__':
     unittest.main()
