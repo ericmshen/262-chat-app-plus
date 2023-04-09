@@ -24,13 +24,19 @@ recipient = None
 # connected socket accessed by all threads
 sock = None
 
+SERVER_HOSTS = ["", "", ""]
+SERVER_PORTS = [22080, 22081, 22082]
+# SERVER_PORTS = [22067, 22068, 22069]
+
+currPrimary = 0
+
 def listen():
     """ Services all receiving functionality over the client socket. Over the lifetime of 
     the connection, it loops and reads from the socket. It first reads a 1-byte status 
     code as specified by the wire protocol, followed by status-specific data. It processes
     the output and displays the results to the user in the terminal. """
     
-    global username
+    global username, currPrimary, sock
     
     # helper function to exit the client
     def stop():
@@ -49,11 +55,35 @@ def listen():
             code = int.from_bytes(code, "big")
         # if try fails, there's an error communicating with the server; exit
         except: stop()
-        # if the server disconnects, it sends back a None or 0; also exit
+        # if the server disconnects, it sends back a None or 0; connect to the next available server
         if not code:
-            print("server disconnected, exiting client")
-            sock.close()
-            os._exit(0)
+            while True:
+                # if we were already connected to the last remaining server, exit the client program
+                if currPrimary == 2:
+                    print("all servers down, exiting client")
+                    sock.close()
+                    os._exit(0)
+                
+                # otherwise, connect to the next available server (in increasing port number order)
+                print(f"<< server {currPrimary} down, attempting to connect to server {currPrimary + 1}")
+
+                # update the index of the new primary server
+                currPrimary += 1
+                host, port = SERVER_HOSTS[currPrimary], SERVER_PORTS[currPrimary]
+                serverAddr = (host, port)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                print(f"starting connection to {host}:{port}")
+                connected = sock.connect_ex(serverAddr)
+
+                # on a succesful connection to a replica (now promoted to primary), continue as normal
+                if connected == 0:
+                    print("<< succesfully connected to server")
+                    # silently make a login request if the client was already logged in
+                    if username != None:
+                        sock.sendall(OP_LOGIN.to_bytes(CODE_LENGTH, "big") + bytes(username, 'ascii'))
+                    break
+                    
+
 
         # all status codes map a unique server response to a particular operation
         # all receives are try-excepted; in the case of ANY error, we exit
@@ -298,19 +328,44 @@ def run():
 
 if __name__ == "__main__":
     # must specify a host and port to connect to
-    if len(sys.argv) != 3:
-        print(f"usage: {sys.argv[0]} <host> <port>")
+    if len(sys.argv) != 4:
+        print(f"usage: {sys.argv[0]} <server 0 host> <server 1 host> <server 2 host>")
         sys.exit(1)
+
+    SERVER_HOSTS = [sys.argv[1], sys.argv[2], sys.argv[3]]
+    port = SERVER_PORTS[currPrimary]
 
     print("starting client...")
     
     # try to initialize the socket; connect_ex returns a code instead of exception
-    host, port = sys.argv[1], int(sys.argv[2])
+    host, port = SERVER_HOSTS[currPrimary], SERVER_PORTS[currPrimary]
     serverAddr = (host, port)
     print(f"starting connection to {host}:{port}")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     connected = sock.connect_ex(serverAddr)
-    if connected != 0:
-        print("<< failed to create socket connection to server, exiting client")
-        sys.exit(1)
+    # TODO: don't copy this code in two places
+    while True:
+        if currPrimary == 2:
+            print("<< failed to create socket connection to server, exiting client")
+            sock.close()
+            os._exit(0)
+                
+        # otherwise, connect to the next available server (in increasing port number order)
+        print(f"<< server {currPrimary} down, attempting to connect to server {currPrimary + 1}")
+
+        # update the index of the new primary server
+        currPrimary += 1
+        host, port = SERVER_HOSTS[currPrimary], SERVER_PORTS[currPrimary]
+        serverAddr = (host, port)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print(f"starting connection to {host}:{port}")
+        connected = sock.connect_ex(serverAddr)
+
+        # on a succesful connection to a replica (now promoted to primary), continue as normal
+        if connected == 0:
+            print("<< succesfully connected to server")
+            # silently make a login request if the client was already logged in
+            if username != None:
+                sock.sendall(OP_LOGIN.to_bytes(CODE_LENGTH, "big") + bytes(username, 'ascii'))
+            break
     run()
