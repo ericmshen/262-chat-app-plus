@@ -1,27 +1,52 @@
 import socket
 from collections import defaultdict
 import threading
+import time
+import pickle
 
 import sys
 sys.path.append('..')
 from utils import *
 
-# We maintain a relatively simple implementation: no selectors are used, with a new
+# we maintain a relatively simple implementation: no selectors are used, with a new
 # thread being opened for each client connection. All data is also stored in memory
 # (so if the server exits, no data is saved). For each client connection, we loop
 # while reading input, processing it, and returning an appropriate response.
 
 # *** VARIABLES *** (to track state of server in an easy, class-free manner)
-# allow any incoming connections on port 22067 by default (port can be specified)
-host, port = "0.0.0.0", 22067
+# The server uuid: either 0, 1, or 2, and the uuid of the primary server.
+SERVER_ID = -1
+PRIMARY_SERVER_ID = 0
 
-# keep track of all registered users
-registeredUsers = set()
+# we need three replicas in total, for which we'll use these identifying ports.
+HOST_LISTEN_ALL = '0.0.0.0'
+SERVER_HOSTS = ["", "", ""]
+SERVER_PORTS = [22067, 22068, 22069]
 
-# the message buffer stores unsent messages, and is a dictionary mapping usernames
-# to a list of messages they are to receive upon login
-# each message is encoded as a string with the format "<sender>|<receiver>"
-messageBuffer = defaultdict(list)
+# (datagram) sockets for communicating with the other servers
+SERVER_CONNECTIONS = [None, None, None]
+
+# this server instance's streaming socket for handling client requests
+SOCK = None
+
+# all relevant quantities to persist in the state. We store this via pickling and will
+# load this upon system reboot.
+SERVER_STATE = {
+    # timestamp of snapshot
+    "timestamp": time.time(),
+    
+    # all registered users
+    "registeredUsers": set(),
+    
+    # the message buffer stores undelivered messages, and is a dictionary mapping usernames
+    # to a list of messages they are to receive upon login
+    # each message is encoded as a string with the format "<sender>|<receiver>"
+    "messageBuffer": defaultdict(list),
+    
+    # we don't need to keep track of which users are logged in - in the event that
+    # the system shuts down, we automatically mark the user as logged out on both the
+    # client and server code
+}
 
 # keep a list of all opened threads, to make sure they don't get GC'd (perhaps unnecessary)
 threads = []
@@ -29,6 +54,23 @@ threads = []
 # map of active, logged in usernames to the sockets through which they are connected 
 # to the server; the keys of this dictionary thus serve as a list of online users
 userToSocket = {}
+
+# helper functions to load and save state from disk 
+def save_server_state():
+    global SERVER_STATE
+    print(f"saving server state for ID {SERVER_ID}")
+    SERVER_STATE["timestamp"] = time.time()
+    with open(f'state/server_{SERVER_ID}.pickle', 'wb') as f:
+        pickle.dump(SERVER_STATE, f)
+        
+def load_server_state():
+    global SERVER_STATE
+    print(f"loading server state for ID {SERVER_ID}")
+    try:
+        with open(f"state/server_{SERVER_ID}.pickle", 'rb') as f:
+            SERVER_STATE = pickle.load(f)
+    except:
+        print("> no previous server state found")
 
 # each individual thread runs this function to communicate with its respective client
 def service_connection(clientSocket):
@@ -87,13 +129,14 @@ def service_connection(clientSocket):
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             except: disconnect()
             # check that the username is new
-            if username in registeredUsers:
+            if username in SERVER_STATE["registeredUsers"]:
                 print(f"{username} is already registered")
                 status = REGISTER_USERNAME_EXISTS
             # register the username by adding it to registeredUsers; the user
             # is not automatically logged in
             else:
-                registeredUsers.add(username)
+                SERVER_STATE["registeredUsers"].add(username)
+                save_server_state()
                 print(f"{username} successfully registered")
                 status = REGISTER_OK
         
@@ -106,7 +149,7 @@ def service_connection(clientSocket):
             try:
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             except: disconnect()
-            if username in registeredUsers:
+            if username in SERVER_STATE["registeredUsers"]:
                 # the user should not be logged in, i.e. not in userToSocket
                 if username in userToSocket:
                     print(f"{username} is already logged in")
@@ -116,16 +159,17 @@ def service_connection(clientSocket):
                     userToSocket[username] = clientSocket
                     # on login we deliver all undelivered messages in the form of a 2-byte header
                     # indicating the number of messages to send, then the messages themselves
-                    numUndelivered = len(messageBuffer[username])
+                    numUndelivered = len(SERVER_STATE["messageBuffer"][username])
                     if numUndelivered > 0:
-                        print(f"{username} successfully logged in, {numUndelivered} unread message(s)")
-                        status = LOGIN_OK_UNREAD_MSG
                         # send the number of unread messages, as well as the formatted messages,
                         # separated by newlines
                         responseHeader = numUndelivered
-                        responseBody = "\n".join(messageBuffer[username])
+                        responseBody = "\n".join(SERVER_STATE["messageBuffer"][username])
                         # clear the buffer for the logged in user
-                        messageBuffer[username] = []
+                        SERVER_STATE["messageBuffer"][username] = []
+                        save_server_state()
+                        status = LOGIN_OK_UNREAD_MSG
+                        print(f"{username} successfully logged in, {numUndelivered} unread message(s)")
                     else:
                         print(f"{username} successfully logged in, no unread messages")
                         status = LOGIN_OK_NO_UNREAD_MSG
@@ -142,7 +186,7 @@ def service_connection(clientSocket):
             try:
                 query = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             except: disconnect()
-            matched = searchUsernames(list(registeredUsers), query)
+            matched = searchUsernames(list(SERVER_STATE["registeredUsers"]), query)
             if matched:
                 # send back data in the form of a 2-byte header describing the number of 
                 # results, then the results themselves separated by |
@@ -172,7 +216,7 @@ def service_connection(clientSocket):
             except: disconnect()
             sender, recipient, message = messageRaw[0], messageRaw[1], messageRaw[2]
             # check if the recipient exists
-            if recipient not in registeredUsers:
+            if recipient not in SERVER_STATE["registeredUsers"]:
                 print(f"recipient {recipient} not found")
                 status = SEND_RECIPIENT_DNE
             # check if the recipient is logged in, and if so deliver instantaneously
@@ -199,8 +243,9 @@ def service_connection(clientSocket):
             # otherwise, store the message in the buffer's reciever slot as
             # <sender>|<message>, and communicate the message's storage
             else:
+                SERVER_STATE["messageBuffer"][recipient].append(f"{sender}|{message}")
+                save_server_state()
                 print(f"buffered message from {sender} to {recipient}")
-                messageBuffer[recipient].append(f"{sender}|{message}")
                 status = SEND_OK_BUFFERED
                 
         # *** LOGOUT ***
@@ -237,7 +282,8 @@ def service_connection(clientSocket):
                 del userToSocket[userToDelete]
                 # the username no longer exists; note one can request a delete, but register
                 # again using the same username
-                registeredUsers.remove(userToDelete)
+                SERVER_STATE["registeredUsers"].remove(userToDelete)
+                save_server_state()
                 print(f"{userToDelete} deleted")
                 status = DELETE_OK
         
@@ -261,45 +307,50 @@ def service_connection(clientSocket):
         clientSocket.sendall(toSend)
         print("server response given")
 
-if __name__ == "__main__":
-    # a port can be specified when running the program
-    if len(sys.argv) > 2:
-        print(f"usage: {sys.argv[0]} <optional port>")
-        sys.exit(1)
-    if len(sys.argv) == 2:
-        port = int(sys.argv[1])
-        
-    print('starting server...')
-    
-    # start the socket, bind it, and broadcast the host/port (for client connections)
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    sock.bind((host, port))
-    print(f"server started, listening on host {socket.gethostname()} and port {port}")
+def setup_server_connections():
+    global SERVER_CONNECTIONS 
+    # connect to other servers
+    # TODO: communicate with other servers to get most updated state
+    # TODO: TRY DOING THIS WITH DATAGRAMS
+    for other_server_id in list({0, 1, 2} - {SERVER_ID}):
+        print(f"attempting to connect to {other_server_id}")
+        SERVER_CONNECTIONS[other_server_id] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        connected = SERVER_CONNECTIONS[other_server_id].connect_ex((SERVER_HOSTS[other_server_id], SERVER_PORTS[other_server_id]))
+        if connected != 0:
+            print(f"{SERVER_ID} can't connect to {other_server_id} - terminating process")
+            sys.exit(1)
+        print(f"{SERVER_ID} connected to {other_server_id}")
 
+def run_primary_server():
     # put the socket into listening mode
-    sock.listen(10)
-    print("server is listening")
-
-    # a forever loop until program exit
+    # start the server's own socket, bind it, and broadcast the host/port (for client connections)
+    SOCK = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    SOCK.bind((HOST_LISTEN_ALL, port))
+    print(f"server started on host {socket.gethostname()} and port {port}")
+    
+    print("server is primary, starting to listen")
+    SOCK.listen(10)
+    
+    # TODO: setup a datagram socket for communication with other servers
+    
     while True:
         # establish connection with client
         try:
-            # a future extension: add timeouts to connections
-            c, addr = sock.accept()
+            c, addr = SOCK.accept()
         # gracefully-ish handle a keyboard interrupt by closing the active sockets;
         # this will also notify the clients that the server connection has ended
         except KeyboardInterrupt:
             print("\ncaught interrupt, shutting down server")
             for c in userToSocket.values():
                 c.close()
-            sock.close()
+            SOCK.close()
             break 
         # also simply shut down if we can't connect to a new user for some reason
         except:
             print("failed to accept socket connection, shutting down server")
             for c in userToSocket.values():
                 c.close()
-            sock.close()
+            SOCK.close()
             break
         print(f"connected to new client {addr[0]}:{addr[1]}")
 
@@ -309,3 +360,25 @@ if __name__ == "__main__":
         servicer.daemon = True
         servicer.start()
         threads.append(servicer)
+
+if __name__ == "__main__":
+    # a port can be specified when running the program
+    if len(sys.argv) != 5:
+        print(f"usage: {sys.argv[0]} <server ID (0, 1, 2)> <server 0 host> <server 1 host> <server 2 host>")
+        sys.exit(1)
+        
+    SERVER_ID = int(sys.argv[1])
+    SERVER_HOSTS = [sys.argv[2], sys.argv[3], sys.argv[4]]
+    port = SERVER_PORTS[SERVER_ID]
+        
+    print(f'starting server with ID {SERVER_ID}')
+    load_server_state()
+    
+    # wait for the other servers to start up
+    time.sleep(5)
+    
+    setup_server_connections()
+
+    # a forever loop until program exit
+    if SERVER_ID == PRIMARY_SERVER_ID:
+        run_primary_server()
