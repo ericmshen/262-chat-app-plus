@@ -16,7 +16,6 @@ from utils import *
 # *** CONSTS *** (or variables set once during initialization)
 # The server uuid: either 0, 1, or 2, and the uuid of the primary server.
 SERVER_ID = -1
-PRIMARY_SERVER_ID = 0
 
 # listen to any incoming client connections
 HOST_LISTEN_ALL = '0.0.0.0'
@@ -65,7 +64,6 @@ userToSocket = {}
 # helper functions to load and save state from disk 
 def save_server_state():
     global serverState
-    print(serverState)
     print(f"saving server state for ID {SERVER_ID}")
     serverState["timestamp"] = time.time()
     with open(f'state/server_{SERVER_ID}.pickle', 'wb') as f:
@@ -358,7 +356,6 @@ def listen_for_updates():
     listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     listener.bind((SERVER_HOSTS[SERVER_ID], INTERNAL_SERVER_PORTS[SERVER_ID]))
 
-    print("listening for updates from the primary...")
     while True:
         # prepare to receive the longest message the primary could possibly send
         data, addr = listener.recvfrom(
@@ -460,15 +457,7 @@ if __name__ == "__main__":
         
     print(f'starting server with ID {SERVER_ID}')
     load_server_state()
-    
-    # # wait for the other servers to start up
-    # time.sleep(5)
-    
-    # setup_server_connections()
 
-    # a forever loop until program exit
-    # if SERVER_ID == PRIMARY_SERVER_ID:
-    #     run_primary_server()
     listener = threading.Thread(target=listen_for_updates, args=())
     listener.daemon = True
     listener.start()
