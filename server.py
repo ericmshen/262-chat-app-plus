@@ -13,29 +13,27 @@ from utils import *
 # (so if the server exits, no data is saved). For each client connection, we loop
 # while reading input, processing it, and returning an appropriate response.
 
-# *** VARIABLES *** (to track state of server in an easy, class-free manner)
+# *** CONSTS *** (or variables set once during initialization)
 # The server uuid: either 0, 1, or 2, and the uuid of the primary server.
 SERVER_ID = -1
 PRIMARY_SERVER_ID = 0
 
-# we need three replicas in total, for which we'll use these identifying ports.
+# listen to any incoming client connections
 HOST_LISTEN_ALL = '0.0.0.0'
-SERVER_HOSTS = ["", "", ""]
-SERVER_PORTS = [22080, 22081, 22082]
-# SERVER_PORTS = [22067, 22068, 22069]
 
-# maintain another set of ports that the servers will use for internal commication (between primary and replicas)
-INTERNAL_SERVER_PORTS = [22070, 22071, 22072]
+# store the hostnames of other servers to communicate with
+SERVER_HOSTS = ["", "", ""]
 
 # stores the indices of the other servers that this server will have to communicate with if it is the primary
 OTHER_SERVERS = []
 
+# *** VARIABLES *** (to track state of server in an easy, class-free manner)
 # this server instance's streaming socket for handling client requests
-SOCK = None
+clientSock = None
 
-# all relevant quantities to persist in the state. We store this via pickling and will
+# all relevant quantities to persist in the state, we store this via pickling and will
 # load this upon system reboot.
-SERVER_STATE = {
+serverState = {
     # timestamp of snapshot
     "timestamp": time.time(),
     
@@ -66,19 +64,19 @@ userToSocket = {}
 
 # helper functions to load and save state from disk 
 def save_server_state():
-    global SERVER_STATE
-    print(SERVER_STATE)
+    global serverState
+    print(serverState)
     print(f"saving server state for ID {SERVER_ID}")
-    SERVER_STATE["timestamp"] = time.time()
+    serverState["timestamp"] = time.time()
     with open(f'state/server_{SERVER_ID}.pickle', 'wb') as f:
-        pickle.dump(SERVER_STATE, f)
+        pickle.dump(serverState, f)
         
 def load_server_state():
-    global SERVER_STATE
+    global serverState
     print(f"loading server state for ID {SERVER_ID}")
     try:
         with open(f"state/server_{SERVER_ID}.pickle", 'rb') as f:
-            SERVER_STATE = pickle.load(f)
+            serverState = pickle.load(f)
     except:
         print("> no previous server state found")
 
@@ -139,13 +137,13 @@ def service_connection(clientSocket, clientAddr):
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             except: disconnect()
             # check that the username is new
-            if username in SERVER_STATE["registeredUsers"]:
+            if username in serverState["registeredUsers"]:
                 print(f"{username} is already registered")
                 status = REGISTER_USERNAME_EXISTS
             # register the username by adding it to registeredUsers; the user
             # is not automatically logged in
             else:
-                SERVER_STATE["registeredUsers"].add(username)
+                serverState["registeredUsers"].add(username)
                 save_server_state()
                 print(f"{username} successfully registered")
                 status = REGISTER_OK
@@ -159,7 +157,7 @@ def service_connection(clientSocket, clientAddr):
             try:
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             except: disconnect()
-            if username in SERVER_STATE["registeredUsers"]:
+            if username in serverState["registeredUsers"]:
                 # the user should not be logged in, i.e. not in userToSocket
                 if username in userToSocket:
                     print(f"{username} is already logged in")
@@ -169,14 +167,14 @@ def service_connection(clientSocket, clientAddr):
                     userToSocket[username] = clientSocket
                     # on login we deliver all undelivered messages in the form of a 2-byte header
                     # indicating the number of messages to send, then the messages themselves
-                    numUndelivered = len(SERVER_STATE["messageBuffer"][username])
+                    numUndelivered = len(serverState["messageBuffer"][username])
                     if numUndelivered > 0:
                         # send the number of unread messages, as well as the formatted messages,
                         # separated by newlines
                         responseHeader = numUndelivered
-                        responseBody = "\n".join(SERVER_STATE["messageBuffer"][username])
+                        responseBody = "\n".join(serverState["messageBuffer"][username])
                         # clear the buffer for the logged in user
-                        SERVER_STATE["messageBuffer"][username] = []
+                        serverState["messageBuffer"][username] = []
                         save_server_state()
                         status = LOGIN_OK_UNREAD_MSG
                         print(f"{username} successfully logged in, {numUndelivered} unread message(s)")
@@ -196,7 +194,7 @@ def service_connection(clientSocket, clientAddr):
             try:
                 query = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
             except: disconnect()
-            matched = searchUsernames(list(SERVER_STATE["registeredUsers"]), query)
+            matched = searchUsernames(list(serverState["registeredUsers"]), query)
             if matched:
                 # send back data in the form of a 2-byte header describing the number of 
                 # results, then the results themselves separated by |
@@ -227,7 +225,7 @@ def service_connection(clientSocket, clientAddr):
             except: disconnect()
             sender, recipient, message = messageRawDecoded[0], messageRawDecoded[1], messageRawDecoded[2]
             # check if the recipient exists
-            if recipient not in SERVER_STATE["registeredUsers"]:
+            if recipient not in serverState["registeredUsers"]:
                 print(f"recipient {recipient} not found")
                 status = SEND_RECIPIENT_DNE
             # check if the recipient is logged in, and if so deliver instantaneously
@@ -254,7 +252,7 @@ def service_connection(clientSocket, clientAddr):
             # otherwise, store the message in the buffer's reciever slot as
             # <sender>|<message>, and communicate the message's storage
             else:
-                SERVER_STATE["messageBuffer"][recipient].append(f"{sender}|{message}")
+                serverState["messageBuffer"][recipient].append(f"{sender}|{message}")
                 save_server_state()
                 print(f"buffered message from {sender} to {recipient}")
                 status = SEND_OK_BUFFERED
@@ -293,7 +291,7 @@ def service_connection(clientSocket, clientAddr):
                 del userToSocket[username]
                 # the username no longer exists; note one can request a delete, but register
                 # again using the same username
-                SERVER_STATE["registeredUsers"].remove(username)
+                serverState["registeredUsers"].remove(username)
                 save_server_state()
                 print(f"{username} deleted")
                 status = DELETE_OK
@@ -304,8 +302,8 @@ def service_connection(clientSocket, clientAddr):
             status = BAD_OPERATION
         
         # inform the replicas of state-changing queries that were succesful
-        stateChangingQueries = {DELETE_OK, LOGOUT_OK, SEND_OK_BUFFERED, LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG, REGISTER_OK}
-        if status in stateChangingQueries:
+        stateChangingStatuses = {DELETE_OK, LOGOUT_OK, SEND_OK_BUFFERED, LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG, REGISTER_OK}
+        if status in stateChangingStatuses:
             update = op.to_bytes(CODE_LENGTH, "big")
 
             if status in {LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG}:
@@ -374,18 +372,18 @@ def listen_for_updates():
 
         if op == OP_REGISTER:
             username = data[1:].decode('ascii')
-            SERVER_STATE["registeredUsers"].add(username)
+            serverState["registeredUsers"].add(username)
             save_server_state()
         elif op == OP_LOGIN:
             messageRawDecoded = data[1:].decode('ascii').split("|")
             clientAddr, username = messageRawDecoded[0], messageRawDecoded[1]
             # addrToUser[clientAddr] = username
-            SERVER_STATE["messageBuffer"][username] = []
+            serverState["messageBuffer"][username] = []
             save_server_state()
         elif op == OP_SEND:
             messageRawDecoded = data[1:].decode('ascii').split("|")
             sender, recipient, message = messageRawDecoded[0], messageRawDecoded[1], messageRawDecoded[2]
-            SERVER_STATE["messageBuffer"][recipient].append(f"{sender}|{message}")
+            serverState["messageBuffer"][recipient].append(f"{sender}|{message}")
             save_server_state()
         # elif op == OP_LOGOUT:
         #     username = data[1:].decode('ascii')
@@ -398,39 +396,40 @@ def listen_for_updates():
             # clientAddr = list(addrToUser.keys())[list(addrToUser.values()).index(username)]
             print(f"deleting client connection to {clientAddr}")
             # del addrToUser[clientAddr]
-            SERVER_STATE["registeredUsers"].remove(username)
+            serverState["registeredUsers"].remove(username)
             save_server_state()    
 
 def run_server():
+    global clientSock
     # put the socket into listening mode
     # start the server's own socket, bind it, and broadcast the host/port (for client connections)
-    SOCK = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    SOCK.bind((HOST_LISTEN_ALL, port))
+    clientSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    clientSock.bind((HOST_LISTEN_ALL, port))
     print(f"server started on host {socket.gethostname()} and port {port}")
     
     print("server listening...")
-    SOCK.listen(10)
+    clientSock.listen(10)
         
     while True:
         # attempt to establish connection with client
         # since clients only initiate connections to the current primary, actually accepting a connection
         # means that the current server replica is the primary
         try:
-            c, addr = SOCK.accept()
+            c, addr = clientSock.accept()
         # gracefully-ish handle a keyboard interrupt by closing the active sockets;
         # this will also notify the clients that the server connection has ended
         except KeyboardInterrupt:
             print("\ncaught interrupt, shutting down server")
             for c in userToSocket.values():
                 c.close()
-            SOCK.close()
+            clientSock.close()
             break 
         # also simply shut down if we can't connect to a new user for some reason
         except:
             print("failed to accept socket connection, shutting down server")
             for c in userToSocket.values():
                 c.close()
-            SOCK.close()
+            clientSock.close()
             break
         print(f"connected to new client {addr[0]}:{addr[1]}")
 

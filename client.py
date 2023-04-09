@@ -13,6 +13,10 @@ from utils import *
 # reads user input, applies client-side checks to operations if applicable, and sends data
 # to the server according to the wire protocol. 
 
+# *** CONSTS *** (or variables set once during initialization)
+# we deterministically set server ports in advance
+SERVER_HOSTS = ["", "", ""]
+
 # *** VARIABLES *** (to track state of client in an easy, class-free manner)
 # username of the logged in user on the client side: if None, no user is logged in
 # we use this as a proxy for detecting if the client code has someone logged in or not
@@ -23,10 +27,6 @@ recipient = None
 
 # connected socket accessed by all threads
 sock = None
-
-SERVER_HOSTS = ["", "", ""]
-SERVER_PORTS = [22080, 22081, 22082]
-# SERVER_PORTS = [22067, 22068, 22069]
 
 currPrimary = 0
 

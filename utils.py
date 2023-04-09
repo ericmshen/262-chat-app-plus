@@ -3,6 +3,13 @@ import re
 import string
 
 # *** CONSTS ***
+# set ports for client-to-server communication
+# we need three replicas in total, for which we'll use these identifying ports
+SERVER_PORTS = [22080, 22081, 22082]
+
+# maintain another set of ports that the servers will use for internal commication (between primary and replicas)
+INTERNAL_SERVER_PORTS = [22070, 22071, 22072]
+
 # operation codes
 OP_REGISTER = 1
 OP_LOGIN = 2
