@@ -28,7 +28,8 @@ recipient = None
 # connected socket accessed by all threads
 sock = None
 
-currPrimary = -1
+# ID of the current primary replica server, with which the client maintains a streaming connection
+primaryServer = -1
 
 def listen():
     """ Services all receiving functionality over the client socket. Over the lifetime of 
@@ -36,7 +37,7 @@ def listen():
     code as specified by the wire protocol, followed by status-specific data. It processes
     the output and displays the results to the user in the terminal. """
     
-    global username, currPrimary, sock
+    global username, primaryServer, sock
     
     # helper function to exit the client
     def stop():
@@ -259,26 +260,27 @@ def serve():
             # send code and payload
             sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
 
+# helper function that creates connections to new servers are required; it starts by connecting
+# to server 0 (given the initial value of primaryServer), and upon disconnects, attempts to connect
+# to servers with higher and higher IDs
 def connectToServer(): 
-    global currPrimary, sock
+    global primaryServer, sock
     while True:
         # if we were already connected to the last remaining server, exit the client program
-        if currPrimary == 2:
+        if primaryServer == 2:
             print("<< failed to create socket connection to server, exiting client")
             sock.close()
             os._exit(0)
 
         # update the index of the new primary server
-        currPrimary += 1
+        primaryServer += 1
 
         # connect to the next available server (in increasing port number order)
-        print(f"<< attempting to connect to server {currPrimary}")
-
-
-        host, port = SERVER_HOSTS[currPrimary], SERVER_PORTS[currPrimary]
+        print(f"<< attempting to connect to server {primaryServer}")
+        host, port = SERVER_HOSTS[primaryServer], SERVER_PORTS[primaryServer]
         serverAddr = (host, port)
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print(f"starting connection to {host}:{port}")
+        print(f"<< attempting connection to {host}:{port}")
         # try to initialize the socket; connect_ex returns a code instead of exception
         connected = sock.connect_ex(serverAddr)
 
@@ -334,7 +336,7 @@ def run():
         sys.exit(0)
 
 if __name__ == "__main__":
-    # must specify a host and port to connect to
+    # must specify all hostnames
     if len(sys.argv) != 4:
         print(f"usage: {sys.argv[0]} <server 0 host> <server 1 host> <server 2 host>")
         sys.exit(1)

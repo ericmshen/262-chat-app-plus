@@ -83,7 +83,7 @@ def load_server_state():
         print("> no previous server state found")
 
 # each individual thread runs this function to communicate with its respective client
-def service_connection(clientSocket, clientAddr):
+def service_connection(clientSocket):
     """ For each thread servicing a client connection. Over the lifetime of the connection, 
     it loops and reads from the client socket. It first reads a 1-byte operation code 
     determining the operation desired by the client (as laid out in the spec), 
@@ -117,6 +117,7 @@ def service_connection(clientSocket, clientAddr):
         # there's an error communicating with the client: close the socket
         except: 
             disconnect()
+            return 
         # if the client disconnects, it sends back a None or 0 over the socket;
         # in this case the socket should also be closed
         if not op:
@@ -140,7 +141,9 @@ def service_connection(clientSocket, clientAddr):
             # read the username
             try:
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
-            except: disconnect()
+            except: 
+                disconnect()
+                return
             # check that the username is new
             if username in serverState["registeredUsers"]:
                 print(f"{username} is already registered")
@@ -161,7 +164,9 @@ def service_connection(clientSocket, clientAddr):
             # read the username
             try:
                 username = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
-            except: disconnect()
+            except: 
+                disconnect()
+                return
             if username in serverState["registeredUsers"]:
                 # the user should not be logged in, i.e. not in userToSocket
                 if username in userToSocket:
@@ -198,7 +203,9 @@ def service_connection(clientSocket, clientAddr):
             # read the query and search for it (query length cannot exceed username length)
             try:
                 query = clientSocket.recv(USERNAME_LENGTH).decode('ascii')
-            except: disconnect()
+            except: 
+                disconnect()
+                return
             matched = searchUsernames(list(serverState["registeredUsers"]), query)
             if matched:
                 # send back data in the form of a 2-byte header describing the number of 
@@ -227,7 +234,9 @@ def service_connection(clientSocket, clientAddr):
                     2 * USERNAME_LENGTH + 
                     2 * DELIMITER_LENGTH )
                 messageRawDecoded = messageRaw.decode('ascii').split("|")
-            except: disconnect()
+            except: 
+                disconnect()
+                return
             sender, recipient, message = messageRawDecoded[0], messageRawDecoded[1], messageRawDecoded[2]
             # check if the recipient exists
             if recipient not in serverState["registeredUsers"]:
@@ -312,22 +321,12 @@ def service_connection(clientSocket, clientAddr):
         stateChangingStatuses = {DELETE_OK, SEND_OK_BUFFERED, LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG, REGISTER_OK}
         if status in stateChangingStatuses:
             update = op.to_bytes(CODE_LENGTH, "big")
-
-            # logins: send the client address - we don't currently use the address, but this information
-            # may be useful for extending implementations
-            if status in {LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG}:
-                print(f"communicating client login to replicas")
-                clientAddrRepr = str(clientAddr) + "|"
-                update += bytes(clientAddrRepr, 'ascii')
-            
-            # undelievered messages: send the message contents
+            # undelivered messages: send the message contents
             if status == SEND_OK_BUFFERED:
                 update += messageRaw
-                
             # for registers, logins, and deletes: send the username in question
             else:
                 update += bytes(username, 'ascii')
-
             # send this update to secondary replicas
             # we use datagrams which are lightweight but less reliable/can't detect if a connection has
             # closed: we can simply send the update to all other servers
@@ -379,8 +378,7 @@ def listen_for_updates(serverSock):
         # login: clear the buffer for the user - we also send along the client address but don't
         # make use of it in our implementation as it stands
         elif op == OP_LOGIN:
-            messageRawDecoded = data[1:].decode('ascii').split("|")
-            _, username = messageRawDecoded[0], messageRawDecoded[1]
+            username = data[1:].decode('ascii')
             serverState["messageBuffer"][username] = []
             save_server_state()
             print(f"state update: logged in user {username}")
@@ -399,18 +397,28 @@ def listen_for_updates(serverSock):
             serverState["registeredUsers"].remove(username)
             save_server_state()
             print(f"state update: deleted user {username}")
-            
+
+# helper function used during initialization: using the server-to-server datagram socket, listens
+# to other servers send their states, and updates this server's state to the most recent state
+# this ensures that after initialization, all servers have the same, latest state
+# the code handling the sending of state itself is located in the main thread
 def get_state_updates(serverSock):
     global serverState
+    # we expect to read states from each of two other servers
     numUpdates = 0
     while True:
-        stateData, _ = serverSock.recvfrom(8192)
+        # read an incoming state from another server
+        # limitation: this implicitly hardcodes that state byte lengths is capped, since with
+        # datagrams we want to get the entire state in one read
+        stateData, _ = serverSock.recvfrom(10262)
         print("received other server state")
         numUpdates += 1
+        # load the other state as a dictionary, and make it this server's state if it's more recent
         otherState = pickle.loads(stateData)
         if otherState["timestamp"] > serverState["timestamp"]:
             print("other server state has newer timestamp, updating")
             serverState = otherState
+        # once we've read two updates, we know there are no more states to receive
         if numUpdates == 2:
             print("all other server states received")
             save_server_state()
@@ -454,7 +462,7 @@ def run_server():
         
         # multithreading setup for multiple concurrent client connections:
         # start a new thread for each client connection and return its identifier
-        servicer = threading.Thread(target=service_connection, args=(c, addr,))
+        servicer = threading.Thread(target=service_connection, args=(c,))
         servicer.daemon = True
         servicer.start()
         threads.append(servicer)
@@ -481,18 +489,28 @@ if __name__ == "__main__":
     serverSock.bind((SERVER_HOSTS[SERVER_ID], INTERNAL_SERVER_PORTS[SERVER_ID]))
     print("server internal socket started on port", INTERNAL_SERVER_PORTS[SERVER_ID])
     
+    # wait for all programs to start and create their server-to-server datagram sockets
     time.sleep(SOCKET_SETUP_DURATION)
+    
+    # share state: each server will concurrently both (a) send its own state to other servers and (b)
+    # receive other servers' states using the datagram socket, updating its own state if the other states
+    # are more recent; no matter how the pattern of state sends, receives, and updates occurs, this 
+    # guarantees that by the end of this process, all servers will have the same, most updated state
+    # thread for listening for other servers' states
     state_listener = threading.Thread(target=get_state_updates, args=(serverSock,))
     state_listener.daemon = True 
     state_listener.start() 
     
+    # send own state to other servers
     stateData = pickle.dumps(serverState)
     for replica in OTHER_SERVERS:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         print(f"sending initial state to replica {SERVER_HOSTS[replica]} {INTERNAL_SERVER_PORTS[replica]}")
         s.sendto(stateData, (SERVER_HOSTS[replica], INTERNAL_SERVER_PORTS[replica]))
+        # wait some tiem for the server to process
         time.sleep(SOCKET_UPDATE_DURATION)
 
+    # wait for the overall operation of sends, receives, and updates to complete among all three servers
     time.sleep(SOCKET_SETUP_DURATION + 2 * SOCKET_UPDATE_DURATION)
 
     # start listening to other servers on another thread

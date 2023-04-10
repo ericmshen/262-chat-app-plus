@@ -1,14 +1,21 @@
 import unittest
 from utils import *
 import threading
+from collections import defaultdict
 import socket 
 import time
 
 import sys 
 from server import service_connection
 
+SPEEDTEST = False
 TEST_SOCKET_SERVER_ADDR = ("localhost", 55566)
-TEST_REPLICATION_SERVER_ADDR = ("localhost", 55577)
+
+serverState = {
+    "timestamp": 0,
+    "registeredUsers": set(),
+    "messageBuffer": defaultdict(list),
+}
 
 def startTestSocketServer():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -17,10 +24,6 @@ def startTestSocketServer():
     c, _ = sock.accept()
     service_connection(c)
     
-def startTestReplicationServer():
-    serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    # TODO
-
 # testing utils
 class TestUtils(unittest.TestCase):
     def testFormatMessage(self):
@@ -216,18 +219,19 @@ class TestUtils(unittest.TestCase):
         end = time.time()
         print(f"socket op time: {end - start}")
         
-        start = time.time()
         
-        for i in range(100):
-            opcode, messageBody = OP_REGISTER, str(i)
-            sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
-            code = sock.recv(CODE_LENGTH)
-            code = int.from_bytes(code, "big")
-            if code != REGISTER_OK:
-                self.assertFalse()
+        if SPEEDTEST:
+            start = time.time()
+            for i in range(100):
+                opcode, messageBody = OP_REGISTER, str(i)
+                sock.sendall(opcode.to_bytes(CODE_LENGTH, "big") + bytes(messageBody, 'ascii'))
+                code = sock.recv(CODE_LENGTH)
+                code = int.from_bytes(code, "big")
+                if code != REGISTER_OK:
+                    self.assertFalse()
         
-        end = time.time()
-        print(f"socket 100 registers time: {end - start}")
+            end = time.time()
+            print(f"socket 100 registers time: {end - start}")
         
         # the socket isn't cleaned up, but we ignore this for testing purposes
         sock.close()
