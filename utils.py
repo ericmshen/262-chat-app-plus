@@ -58,6 +58,9 @@ DELIMITER_LENGTH = 1
 CODE_LENGTH = 1
 MSG_HEADER_LENGTH = 2
 
+# support up to 10 clients
+CLIENT_CAPACITY = 10
+
 # *** HELPER FUNCTIONS ***
 # take a sender, recipient, and message body and return a string that represents
 # the encoding of the message sent over the socket

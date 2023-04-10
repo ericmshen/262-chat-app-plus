@@ -60,13 +60,18 @@ threads = []
 userToSocket = {}
 
 # helper functions to load and save state from disk 
+# save the state as a pickle
+# we currently have a rather inefficient implementation where the server state is saved to disk
+# each time it is updated, so you'll see this being called a couple times below when handling
+# client connections
 def save_server_state():
     global serverState
     print(f"saving server state for ID {SERVER_ID}")
     serverState["timestamp"] = time.time()
     with open(f'state/server_{SERVER_ID}.pickle', 'wb') as f:
         pickle.dump(serverState, f)
-        
+
+# attempt to load the state from a pickle (if it exists)
 def load_server_state():
     global serverState
     print(f"loading server state for ID {SERVER_ID}")
@@ -119,8 +124,11 @@ def service_connection(clientSocket, clientAddr):
             return
         op = int.from_bytes(op, "big")
         # values to return over the socket
+        # the server status of the operation
         status = UNKNOWN_ERROR
+        # a reponse header used in some operations, e.g. for the length in bytes of the body
         responseHeader = None
+        # the response body, whose form and length depends on the operation and status code
         responseBody = None
         print(f"> client issued operation code {op}")
 
@@ -297,25 +305,34 @@ def service_connection(clientSocket, clientAddr):
             print(">> unknown operation issued")
             status = BAD_OPERATION
         
-        # inform the replicas of state-changing queries that were successful
-        stateChangingStatuses = {DELETE_OK, LOGOUT_OK, SEND_OK_BUFFERED, LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG, REGISTER_OK}
+        # server-to-server communication for persistence of state:
+        # inform the replicas of state-changing queries that were successful so they can update their state
+        # we use datagrams - see the dev journal for discussion
+        stateChangingStatuses = {DELETE_OK, SEND_OK_BUFFERED, LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG, REGISTER_OK}
         if status in stateChangingStatuses:
             update = op.to_bytes(CODE_LENGTH, "big")
 
+            # logins: send the client address - we don't currently use the address, but this information
+            # may be useful for extending implementations
             if status in {LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG}:
-                print(clientAddr)
+                print(f"communicating client login to replicas")
                 clientAddrRepr = str(clientAddr) + "|"
                 update += bytes(clientAddrRepr, 'ascii')
             
-            # inform the replicas of the new message which needs to be cached
+            # undelievered messages: send the message contents
             if status == SEND_OK_BUFFERED:
-                update +=  messageRaw
+                update += messageRaw
+                
+            # for registers, logins, and deletes: send the username in question
             else:
                 update += bytes(username, 'ascii')
 
+            # send this update to secondary replicas
+            # we use datagrams which are lightweight but less reliable/can't detect if a connection has
+            # closed: we can simply send the update to all other servers
             s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             for replica in OTHER_SERVERS:
-                print(f"> sending update to replica {SERVER_HOSTS[replica]} {INTERNAL_SERVER_PORTS[replica]}")
+                print(f"sending update to replica {SERVER_HOSTS[replica]} {INTERNAL_SERVER_PORTS[replica]}")
                 s.sendto(update, (SERVER_HOSTS[replica], INTERNAL_SERVER_PORTS[replica]))
                 # sleep to give replicas time to update their states
                 time.sleep(0.3)
@@ -335,8 +352,10 @@ def service_connection(clientSocket, clientAddr):
         clientSocket.sendall(toSend)
         print("server response given")
 
-# if the server is a replica it needs to listen for updates from the primary
+# if the server is a replica it needs to listen for updates from the primary; this is the helper 
+# function to do this, given the socket where updates are being received
 def listen_for_updates(serverSock):
+    # run this in a loop
     while True:
         # prepare to receive the longest message the primary could possibly send
         data, _ = serverSock.recvfrom(
@@ -346,32 +365,42 @@ def listen_for_updates(serverSock):
             2 * DELIMITER_LENGTH)
 
         print("received server state update")
+        # check what type of state update this is
         op = data[0]
 
+        # registers: add the user
         if op == OP_REGISTER:
             username = data[1:].decode('ascii')
             serverState["registeredUsers"].add(username)
             save_server_state()
             print(f"state update: registered user {username}")
+        
+        # login: clear the buffer for the user - we also send along the client address but don't
+        # make use of it in our implementation as it stands
         elif op == OP_LOGIN:
             messageRawDecoded = data[1:].decode('ascii').split("|")
-            clientAddr, username = messageRawDecoded[0], messageRawDecoded[1]
+            _, username = messageRawDecoded[0], messageRawDecoded[1]
             serverState["messageBuffer"][username] = []
             save_server_state()
-            print(f"state update: registered user {username}")
+            print(f"state update: logged in user {username}")
+        
+        # (buffered) sends: update the message cache
         elif op == OP_SEND:
             messageRawDecoded = data[1:].decode('ascii').split("|")
             sender, recipient, message = messageRawDecoded[0], messageRawDecoded[1], messageRawDecoded[2]
             serverState["messageBuffer"][recipient].append(f"{sender}|{message}")
             save_server_state()
-            print(f"state update: buffered message from {sender} to {message}")
+            print(f"state update: buffered message from {sender} to {recipient}")
+            
+        # deletes: remove the user
         elif op == OP_DELETE:
             username = data[1:].decode('ascii')
-            print(f"deleting client connection to {clientAddr}")
             serverState["registeredUsers"].remove(username)
             save_server_state()
             print(f"state update: deleted user {username}")
 
+# function that sets up the client-to-server socket, and primes the server to listen to client
+# connections across this socket
 def run_server():
     global clientSock
     # put the socket into listening mode
@@ -380,13 +409,13 @@ def run_server():
     clientSock.bind((HOST_LISTEN_ALL, port))
     print(f"server socket started on host {socket.gethostname()} and port {port}")
     
+    clientSock.listen(CLIENT_CAPACITY)
     print("server listening for clients...")
-    clientSock.listen(10)
         
     while True:
-        # attempt to establish connection with client
+        # attempt to establish connection with clients
         # since clients only initiate connections to the current primary, actually accepting a connection
-        # means that the current server replica is the primary
+        # means that the current server replica now becomes the primary
         try:
             c, addr = clientSock.accept()
         # gracefully-ish handle a keyboard interrupt by closing the active sockets;
@@ -419,21 +448,28 @@ if __name__ == "__main__":
         print(f"usage: {sys.argv[0]} <server ID (0, 1, 2)> <server 0 host> <server 1 host> <server 2 host>")
         sys.exit(1)
         
+    # set the server's current ID, and the other servers' addresses
     SERVER_ID = int(sys.argv[1])
     SERVER_HOSTS = [sys.argv[2], sys.argv[3], sys.argv[4]]
     port = SERVER_PORTS[SERVER_ID]
     OTHER_SERVERS = list({0, 1, 2} - {SERVER_ID})
         
+    # persistence: check if there is existing server state
     print(f'starting server with ID {SERVER_ID}')
     load_server_state()
     
+    # set up a datagram socket to listen for updates from other servers if the server isn't currently
+    # a primary replica (see design doc)
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     serverSock.bind((SERVER_HOSTS[SERVER_ID], INTERNAL_SERVER_PORTS[SERVER_ID]))
     print("server internal socket started on port", INTERNAL_SERVER_PORTS[SERVER_ID])
 
+    # start listening to other servers on another thread
     listener = threading.Thread(target=listen_for_updates, args=(serverSock,))
     listener.daemon = True
     listener.start()
     threads.append(listener)
 
+    # set up this server's client-to-server socket too, anticipating eventual connections (when the
+    # server becomes the primary replica)
     run_server()
