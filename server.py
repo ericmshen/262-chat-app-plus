@@ -21,10 +21,10 @@ SERVER_ID = -1
 HOST_LISTEN_ALL = '0.0.0.0'
 
 # store the hostnames of other servers to communicate with
-SERVER_HOSTS = ["", "", ""]
+SERVER_HOSTS = ["localhost", "localhost", "localhost"]
 
 # stores the indices of the other servers that this server will have to communicate with if it is the primary
-OTHER_SERVERS = []
+OTHER_SERVERS = [-1]
 
 # *** VARIABLES *** (to track state of server in an easy, class-free manner)
 # this server instance's streaming socket for handling client requests
