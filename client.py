@@ -58,7 +58,7 @@ def listen():
         # if the server disconnects, it sends back a None or 0; connect to the next available server
         if not code:
             connectToServer()
-            print("Connected to a new server. Caution, if you just sent a request, it may have not gone through.")
+            print("connected to a new server (if you just sent a request, it may have not gone through)")
             continue
 
         # all status codes map a unique server response to a particular operation

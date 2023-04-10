@@ -36,8 +36,9 @@ serverSock = None
 # all relevant quantities to persist in the state, we store this via pickling and will
 # load this upon system reboot.
 serverState = {
-    # timestamp of snapshot
-    "timestamp": time.time(),
+    # timestamp of snapshot - default value is set to 0 so that any valid states with true timestamps
+    # will be seen as more recent
+    "timestamp": 0,
     
     # all registered users
     "registeredUsers": set(),
@@ -335,7 +336,7 @@ def service_connection(clientSocket, clientAddr):
                 print(f"sending update to replica {SERVER_HOSTS[replica]} {INTERNAL_SERVER_PORTS[replica]}")
                 s.sendto(update, (SERVER_HOSTS[replica], INTERNAL_SERVER_PORTS[replica]))
                 # sleep to give replicas time to update their states
-                time.sleep(0.3)
+                time.sleep(SOCKET_UPDATE_DURATION)
 
         # the server's response to the original client will ALWAYS consist of a 1-byte status 
         # code, followed by a response header and body if any
@@ -398,6 +399,22 @@ def listen_for_updates(serverSock):
             serverState["registeredUsers"].remove(username)
             save_server_state()
             print(f"state update: deleted user {username}")
+            
+def get_state_updates(serverSock):
+    global serverState
+    numUpdates = 0
+    while True:
+        stateData, _ = serverSock.recvfrom(8192)
+        print("received other server state")
+        numUpdates += 1
+        otherState = pickle.loads(stateData)
+        if otherState["timestamp"] > serverState["timestamp"]:
+            print("other server state has newer timestamp, updating")
+            serverState = otherState
+        if numUpdates == 2:
+            print("all other server states received")
+            save_server_state()
+            return
 
 # function that sets up the client-to-server socket, and primes the server to listen to client
 # connections across this socket
@@ -463,6 +480,20 @@ if __name__ == "__main__":
     serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     serverSock.bind((SERVER_HOSTS[SERVER_ID], INTERNAL_SERVER_PORTS[SERVER_ID]))
     print("server internal socket started on port", INTERNAL_SERVER_PORTS[SERVER_ID])
+    
+    time.sleep(SOCKET_SETUP_DURATION)
+    state_listener = threading.Thread(target=get_state_updates, args=(serverSock,))
+    state_listener.daemon = True 
+    state_listener.start() 
+    
+    stateData = pickle.dumps(serverState)
+    for replica in OTHER_SERVERS:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        print(f"sending initial state to replica {SERVER_HOSTS[replica]} {INTERNAL_SERVER_PORTS[replica]}")
+        s.sendto(stateData, (SERVER_HOSTS[replica], INTERNAL_SERVER_PORTS[replica]))
+        time.sleep(SOCKET_UPDATE_DURATION)
+
+    time.sleep(SOCKET_SETUP_DURATION + 2 * SOCKET_UPDATE_DURATION)
 
     # start listening to other servers on another thread
     listener = threading.Thread(target=listen_for_updates, args=(serverSock,))

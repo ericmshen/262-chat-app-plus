@@ -61,6 +61,11 @@ MSG_HEADER_LENGTH = 2
 # support up to 10 clients
 CLIENT_CAPACITY = 10
 
+# time to wait for server sockets to initialize and share state
+SOCKET_SETUP_DURATION = 5
+# time to wait for other sockets to implement updates
+SOCKET_UPDATE_DURATION = 0.25
+
 # *** HELPER FUNCTIONS ***
 # take a sender, recipient, and message body and return a string that represents
 # the encoding of the message sent over the socket

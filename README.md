@@ -15,7 +15,7 @@ To run the server code:
 - in each terminal, type `python3 server.py <ID> <HOST 0> <HOST 1> <HOST 2>` where the ID is the server ID to be run in that terminal (either 0, 1, or 2), and the HOSTs are the host names of the respective computer running the server code in that terminal (to run everything locally each HOST can be `localhost`)
 - make sure each terminal runs a separate server ID, and that the host names correspond to the hosts of the computers running each corresponding server (order matters); for example, if host 1 is running on `host.harvard.edu`, then `<HOST 1>` should be `host.harvard.edu`
 - run each command to boot up the servers within 5 seconds of each other
-- you can specify an optional port to run on as an argument
+- you are ready to run client code once each server has printed that they are listening for clients
 - try shutting down servers unexpectedly by ^Cing
 
 To run the client code:
