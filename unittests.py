@@ -8,6 +8,7 @@ import sys
 from server import service_connection
 
 TEST_SOCKET_SERVER_ADDR = ("localhost", 55566)
+TEST_REPLICATION_SERVER_ADDR = ("localhost", 55577)
 
 def startTestSocketServer():
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -15,6 +16,10 @@ def startTestSocketServer():
     sock.listen(2)
     c, _ = sock.accept()
     service_connection(c)
+    
+def startTestReplicationServer():
+    serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    # TODO
 
 # testing utils
 class TestUtils(unittest.TestCase):

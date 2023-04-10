@@ -30,6 +30,9 @@ OTHER_SERVERS = []
 # this server instance's streaming socket for handling client requests
 clientSock = None
 
+# this server instance's datagram socket for server-to-server communications
+serverSock = None
+
 # all relevant quantities to persist in the state, we store this via pickling and will
 # load this upon system reboot.
 serverState = {
@@ -55,11 +58,6 @@ threads = []
 # map of active, logged in usernames to the sockets through which they are connected 
 # to the server; the keys of this dictionary thus serve as a list of online users
 userToSocket = {}
-
-# map of active, logged in usernames to the addresses of the sockets through which they are connected
-# to the server; allows replicas to identify which clients are logged in as which users in the case the
-# primary fails
-# addrToUser = {}  
 
 # helper functions to load and save state from disk 
 def save_server_state():
@@ -299,7 +297,7 @@ def service_connection(clientSocket, clientAddr):
             print(">> unknown operation issued")
             status = BAD_OPERATION
         
-        # inform the replicas of state-changing queries that were succesful
+        # inform the replicas of state-changing queries that were successful
         stateChangingStatuses = {DELETE_OK, LOGOUT_OK, SEND_OK_BUFFERED, LOGIN_OK_NO_UNREAD_MSG, LOGIN_OK_UNREAD_MSG, REGISTER_OK}
         if status in stateChangingStatuses:
             update = op.to_bytes(CODE_LENGTH, "big")
@@ -337,64 +335,42 @@ def service_connection(clientSocket, clientAddr):
         clientSocket.sendall(toSend)
         print("server response given")
 
-# def setup_server_connections():
-#     global SERVER_CONNECTIONS 
-#     # connect to other servers
-#     # TODO: communicate with other servers to get most updated state
-#     # TODO: TRY DOING THIS WITH DATAGRAMS
-#     for other_server_id in list({0, 1, 2} - {SERVER_ID}):
-#         print(f"attempting to connect to {other_server_id}")
-#         SERVER_CONNECTIONS[other_server_id] = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#         connected = SERVER_CONNECTIONS[other_server_id].connect_ex((SERVER_HOSTS[other_server_id], SERVER_PORTS[other_server_id]))
-#         if connected != 0:
-#             print(f"{SERVER_ID} can't connect to {other_server_id} - terminating process")
-#             sys.exit(1)
-#         print(f"{SERVER_ID} connected to {other_server_id}")
-
 # if the server is a replica it needs to listen for updates from the primary
-def listen_for_updates():
-    listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    listener.bind((SERVER_HOSTS[SERVER_ID], INTERNAL_SERVER_PORTS[SERVER_ID]))
-
+def listen_for_updates(serverSock):
     while True:
         # prepare to receive the longest message the primary could possibly send
-        data, addr = listener.recvfrom(
+        data, _ = serverSock.recvfrom(
             CODE_LENGTH + 
             MESSAGE_LENGTH + 
             2 * USERNAME_LENGTH + 
             2 * DELIMITER_LENGTH)
 
-        print("Received message:", data)
+        print("received server state update")
         op = data[0]
 
         if op == OP_REGISTER:
             username = data[1:].decode('ascii')
             serverState["registeredUsers"].add(username)
             save_server_state()
+            print(f"state update: registered user {username}")
         elif op == OP_LOGIN:
             messageRawDecoded = data[1:].decode('ascii').split("|")
             clientAddr, username = messageRawDecoded[0], messageRawDecoded[1]
-            # addrToUser[clientAddr] = username
             serverState["messageBuffer"][username] = []
             save_server_state()
+            print(f"state update: registered user {username}")
         elif op == OP_SEND:
             messageRawDecoded = data[1:].decode('ascii').split("|")
             sender, recipient, message = messageRawDecoded[0], messageRawDecoded[1], messageRawDecoded[2]
             serverState["messageBuffer"][recipient].append(f"{sender}|{message}")
             save_server_state()
-        # elif op == OP_LOGOUT:
-        #     username = data[1:].decode('ascii')
-            # TODO: test if this works
-            # clientAddr = list(addrToUser.keys())[list(addrToUser.values()).index(username)]
-            # print(f"deleting client connection to {clientAddr}")
-            # del addrToUser[clientAddr]
+            print(f"state update: buffered message from {sender} to {message}")
         elif op == OP_DELETE:
             username = data[1:].decode('ascii')
-            # clientAddr = list(addrToUser.keys())[list(addrToUser.values()).index(username)]
             print(f"deleting client connection to {clientAddr}")
-            # del addrToUser[clientAddr]
             serverState["registeredUsers"].remove(username)
-            save_server_state()    
+            save_server_state()
+            print(f"state update: deleted user {username}")
 
 def run_server():
     global clientSock
@@ -402,9 +378,9 @@ def run_server():
     # start the server's own socket, bind it, and broadcast the host/port (for client connections)
     clientSock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     clientSock.bind((HOST_LISTEN_ALL, port))
-    print(f"server started on host {socket.gethostname()} and port {port}")
+    print(f"server socket started on host {socket.gethostname()} and port {port}")
     
-    print("server listening...")
+    print("server listening for clients...")
     clientSock.listen(10)
         
     while True:
@@ -428,15 +404,8 @@ def run_server():
                 c.close()
             clientSock.close()
             break
-        print(f"connected to new client {addr[0]}:{addr[1]}")
-
-        # if this is a replica that has been promoted to primary, remember which users were logged in
-        # by matching addresses with the address values of logged in users stored in state
-        # if str(addr) in addrToUser:
-        #     userToSocket[addrToUser[str(addr)]] = c
+        print(f"connected to new client {addr[0]}:{addr[1]} - now acting as primary replica")
         
-        # print(userToSocket)
-
         # multithreading setup for multiple concurrent client connections:
         # start a new thread for each client connection and return its identifier
         servicer = threading.Thread(target=service_connection, args=(c, addr,))
@@ -457,8 +426,12 @@ if __name__ == "__main__":
         
     print(f'starting server with ID {SERVER_ID}')
     load_server_state()
+    
+    serverSock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    serverSock.bind((SERVER_HOSTS[SERVER_ID], INTERNAL_SERVER_PORTS[SERVER_ID]))
+    print("server internal socket started on port", INTERNAL_SERVER_PORTS[SERVER_ID])
 
-    listener = threading.Thread(target=listen_for_updates, args=())
+    listener = threading.Thread(target=listen_for_updates, args=(serverSock,))
     listener.daemon = True
     listener.start()
     threads.append(listener)

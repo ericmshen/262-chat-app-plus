@@ -58,6 +58,7 @@ def listen():
         # if the server disconnects, it sends back a None or 0; connect to the next available server
         if not code:
             connectToServer()
+            print("Connected to a new server. Caution, if you just sent a request, it may have not gone through.")
             continue
 
         # all status codes map a unique server response to a particular operation
@@ -283,7 +284,7 @@ def connectToServer():
 
         # on a succesful connection to a replica (now promoted to primary), continue as normal
         if connected == 0:
-            print("<< succesfully connected to server")
+            print("<< successfully connected to server")
             # silently make a login request if the client was already logged in
             if username != None:
                 sock.sendall(OP_LOGIN.to_bytes(CODE_LENGTH, "big") + bytes(username, 'ascii'))
