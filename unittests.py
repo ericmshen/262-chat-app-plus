@@ -26,10 +26,6 @@ def startTestSocketServer():
     c, _ = sock.accept()
     service_connection(c)
 
-# testing functionality added in programming project 3
-    
-
-    
 # testing utils
 class TestUtils(unittest.TestCase):
     @classmethod
@@ -251,6 +247,7 @@ class TestUtils(unittest.TestCase):
         # give system enough time to delete the file
         time.sleep(0.1)
     
+    # testing functionality added in programming project 3
     def testPersistence(self):
         # perform state-changing actions and ensure that they are written to file for the main server
         # register two new users
